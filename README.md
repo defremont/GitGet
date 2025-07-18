@@ -1,337 +1,365 @@
 # Portfolio Generator
 
-A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses multiple AI providers (Anthropic, OpenAI, Google Gemini) to generate a comprehensive portfolio summary with detailed project analysis. See a output example at `output_example.md`.
+[![License: GPL v3](https://img.shields.io/badge/License-GPLv3-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+[![Python](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Version](https://img.shields.io/badge/version-2.0.0-green.svg)](https://github.com/yourusername/portfolio-generator/releases)
+[![Build Status](https://img.shields.io/badge/build-passing-brightgreen.svg)](https://github.com/yourusername/portfolio-generator/actions)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
 
-🌟 **NEW**: Multi-AI provider support with Gemini 2.5 Pro as default! Now includes estimated lines of code and highlights your top 5 projects!
+A powerful, modular Python application that analyzes your GitHub and GitLab repositories to generate comprehensive portfolio summaries using multiple AI providers. Built with clean architecture principles for maintainability and extensibility.
 
-## Recent Updates
+🌟 **NEW in v2.0.0**: Complete architectural refactor with modular design, improved error handling, and professional CLI interface!
 
-### v2.0.0 - Multi-AI Provider Support
-- **Multiple AI providers**: Support for Anthropic Claude, OpenAI GPT, and Google Gemini
-- **Smart model selection**: Choose from reasoning models, cheaper options, and free tiers
-- **Gemini 2.5 Pro default**: Best free model with excellent analysis capabilities
-- **Model recommendations**: Built-in guidance for choosing the right model for your needs
-- **Backward compatibility**: Existing API keys continue to work
+## 🚀 Quick Start
 
-### v1.6.0 - Enhanced Portfolio Analysis & Simplified Workflow
-- **Lines of code estimation**: Automatically estimates total lines of code across all projects
-- **Top 5 projects highlight**: AI identifies and features your most significant projects
-- **Streamlined workflow**: Removed HTML generation for faster, focused portfolio creation
-- **Enhanced AI analysis**: Improved project ranking and technical skill assessment
-- **Performance improvements**: Faster execution with simplified two-stage process
-
-### v1.3.0 - Smart Data Filtering & Clean JSON Output
-- **Conditional attribute inclusion**: Only includes stars/forks if > 0, descriptions/READMEs if not empty
-- **Total commits tracking**: Shows total commits from all users (not just authenticated user)
-- **Cleaner JSON data**: Removes irrelevant repository flags and empty attributes
-- **Focused analysis**: AI gets cleaner, more meaningful data for better portfolio generation
-
-### v1.2.0 - Enhanced AI Analysis & Project Details
-- **Comprehensive AI prompts**: Significantly improved AI analysis with professional portfolio writing approach
-- **Interactive HTML portfolio**: Complete responsive website with project showcase and professional presentation
-- **Duplicate commit filtering**: Ignores commits with identical messages to focus on unique contributions
-- **Enhanced sorting**: Projects sorted by commits, stars, forks, and documentation quality
-- **Interview preparation**: AI-generated talking points and project highlights for interviews
-
-### v1.1.0 - Improved Commit Detection & Platform Selection
-- **Fixed commit counting**: Improved user commit detection by tracking multiple email addresses and usernames
-- **Enhanced debugging**: Added detailed output to help troubleshoot commit counting issues
-- **Platform selection**: New `--platform` option to analyze only GitHub or only GitLab repositories
-- **Better error handling**: More informative error messages and troubleshooting tips
-
-## Setup
-
-1. Install dependencies:
 ```bash
+# Install dependencies
 pip install -r requirements.txt
+
+# Check configuration
+python portfolio_generator_cli.py --check-config
+
+# Generate portfolio with default settings (Google Gemini)
+python portfolio_generator_cli.py
+
+# Generate with specific AI provider
+python portfolio_generator_cli.py --model-provider anthropic --model-name claude-3-5-haiku-latest
 ```
 
-2. Set up environment variables:
-```bash
-# AI Provider API Keys (choose one or more)
-export GEMINI_API_KEY="your_gemini_api_key"      # Google Gemini (recommended - free)
-export ANTHROPIC_API_KEY="your_anthropic_api_key"  # Anthropic Claude (paid)
-export OPENAI_API_KEY="your_openai_api_key"      # OpenAI GPT (paid/free tiers)
+## 📋 Table of Contents
 
-# Optional (for private repos and higher rate limits)
+- [Features](#-features)
+- [Installation](#-installation)
+- [Configuration](#-configuration)
+- [Usage](#-usage)
+- [Architecture](#-architecture)
+- [AI Models & Providers](#-ai-models--providers)
+- [API Setup](#-api-setup)
+- [Output](#-output)
+- [Troubleshooting](#-troubleshooting)
+- [Contributing](#-contributing)
+- [License](#-license)
+
+## ✨ Features
+
+### 🎯 Core Functionality
+- **Multi-platform support**: GitHub and GitLab (including self-hosted)
+- **Comprehensive analysis**: Public and private repositories
+- **Smart filtering**: Configurable commit thresholds and project selection
+- **Rate limiting**: Automatic handling with intelligent delays
+- **Stage-based execution**: Separate data collection and analysis phases
+
+### 🤖 AI-Powered Analysis
+- **Multiple AI providers**: Anthropic Claude, OpenAI GPT, Google Gemini
+- **Professional summaries**: Detailed portfolio analysis and recommendations
+- **Top project highlights**: AI-identified most significant projects
+- **Code metrics**: Estimated lines of code across all projects
+- **Interview preparation**: Generated talking points and project highlights
+
+### 🏗️ Architecture
+- **Modular design**: Clean separation of concerns
+- **Extensible**: Easy to add new AI providers or repository platforms
+- **Testable**: Comprehensive error handling and logging
+- **Professional CLI**: Rich help system and configuration validation
+
+## 🔧 Installation
+
+### Prerequisites
+- Python 3.8 or higher
+- pip package manager
+
+### Install Dependencies
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/portfolio-generator.git
+cd portfolio-generator
+
+# Install core dependencies
+pip install -r requirements.txt
+
+# Optional: Install specific AI providers
+pip install anthropic          # For Anthropic Claude
+pip install openai            # For OpenAI GPT
+pip install google-generativeai  # For Google Gemini
+```
+
+### Development Installation
+```bash
+# Install in development mode
+pip install -e .
+
+# Install development dependencies
+pip install -e ".[dev]"
+```
+
+## ⚙️ Configuration
+
+### Environment Variables
+
+Set up your API keys and tokens:
+
+```bash
+# AI Provider API Keys (at least one required)
+export GEMINI_API_KEY="your_gemini_api_key"          # Google Gemini (recommended - free)
+export ANTHROPIC_API_KEY="your_anthropic_api_key"    # Anthropic Claude (paid)
+export OPENAI_API_KEY="your_openai_api_key"          # OpenAI GPT (paid/free tiers)
+
+# Repository tokens (optional - for private repos and higher rate limits)
 export GITHUB_TOKEN="your_github_token"
 export GITLAB_TOKEN="your_gitlab_token"
 
-# Optional (if using self-hosted GitLab)
-export GITLAB_URL="https://your-gitlab-instance.com"
+# Optional GitLab configuration
+export GITLAB_URL="https://your-gitlab-instance.com"  # For self-hosted GitLab
 ```
 
-## Usage
+### Configuration Check
+```bash
+# Verify your configuration
+python portfolio_generator_cli.py --check-config
+```
+
+## 🎮 Usage
 
 ### Basic Usage
 
-#### Using API tokens (recommended for private repos):
 ```bash
-# Default: uses Gemini 2.5 Pro (free)
-python portfolio_generator.py
+# Generate portfolio with default settings
+python portfolio_generator_cli.py
 
-# Using specific AI provider
-python portfolio_generator.py --model-provider anthropic --model-name claude-3-5-haiku-latest
-python portfolio_generator.py --model-provider openai --model-name gpt-4.1-nano
-python portfolio_generator.py --model-provider google --model-name gemini-2.5-flash
+# Use specific usernames (for public repos)
+python portfolio_generator_cli.py --github-username myuser --gitlab-username myuser
+
+# Use existing data to regenerate summary
+python portfolio_generator_cli.py --use-existing
 ```
 
-#### Using usernames (public repos only):
+### Advanced Usage
+
 ```bash
-python portfolio_generator.py --github-username your_github_username --gitlab-username your_gitlab_username
+# Use specific AI provider and model
+python portfolio_generator_cli.py --model-provider anthropic --model-name claude-3-5-sonnet-latest
+
+# Analyze only GitHub repositories with limits
+python portfolio_generator_cli.py --platform github --max-commits 50 --min-commits 5
+
+# Run only data collection (Stage 1)
+python portfolio_generator_cli.py --stage 1
+
+# Run only analysis (Stage 2)
+python portfolio_generator_cli.py --stage 2
+
+# Enable debug mode
+python portfolio_generator_cli.py --debug
 ```
 
-#### Use existing data (fast):
-```bash
-python portfolio_generator.py --use-existing
-```
-
-### Stage-based Execution
-
-The script supports two-stage execution for better control:
-
-#### Stage 1: Data Collection Only
-```bash
-python portfolio_generator.py --stage 1
-```
-Fetches repository data and saves to `portfolio_data_[timestamp].json`
-
-#### Stage 2: Analysis Only
-```bash
-python portfolio_generator.py --stage 2
-```
-Analyzes the most recent data file and generates portfolio summary with top 5 projects and lines of code estimation
-
-#### Run Both Stages (Default)
-```bash
-python portfolio_generator.py
-```
-Runs data collection and analysis sequentially
-
-### Additional Options
-
-#### Minimum Commits Filter
-```bash
-python portfolio_generator.py --min-commits 5
-```
-Only includes projects where you have at least 5 commits (default: 1)
-
-#### Maximum Commits Per Project (JSON Size Control)
-```bash
-python portfolio_generator.py --max-commits 10
-```
-Limits commits per project in JSON to most recent N commits (default: all commits)
-
-#### Platform Selection
-```bash
-# Analyze only GitHub repositories
-python portfolio_generator.py --platform github
-
-# Analyze only GitLab repositories
-python portfolio_generator.py --platform gitlab
-```
-
-#### Combined Example
-```bash
-python portfolio_generator.py --github-username myuser --min-commits 10 --max-commits 20 --stage 1
-```
-
-## AI Models & Providers
-
-### 🎯 Recommended Models
-
-| Provider | Model | Cost | Reasoning | Best For |
-|----------|-------|------|-----------|----------|
-| **Google** | `gemini-2.5-pro` | ✅ Free | ❌ No | **Default choice** - Best free model with excellent analysis |
-| **Google** | `gemini-2.5-flash` | ✅ Free | ❌ No | Fastest option for quick generation |
-| **Anthropic** | `claude-sonnet-4-0` | 💰 Paid | ✅ Yes | Premium reasoning capabilities |
-| **Anthropic** | `claude-3-5-haiku-latest` | 💰 Paid | ❌ No | Cheaper Claude option |
-| **OpenAI** | `gpt-4.1` | 💰 Paid | ❌ No | Reliable GPT-4 performance |
-| **OpenAI** | `gpt-4.1-nano` | 🆓 Free tier | ❌ No | Good free option with limits |
-| **OpenAI** | `o4-mini` | 💰 Paid | ✅ Yes | OpenAI's reasoning model |
-| **OpenAI** | `gpt-4.1-mini` | 🆓 Free tier | ❌ No | Basic free option |
-
-### 🚀 Quick Start Recommendations
-
-**For beginners or cost-conscious users:**
-```bash
-# Use default Gemini 2.5 Pro (free and excellent)
-python portfolio_generator.py
-```
-
-**For users wanting faster results:**
-```bash
-python portfolio_generator.py --model-provider google --model-name gemini-2.5-flash
-```
-
-**For premium reasoning capabilities:**
-```bash
-python portfolio_generator.py --model-provider anthropic --model-name claude-sonnet-4-0
-```
-
-**For budget-conscious users with existing credits:**
-```bash
-python portfolio_generator.py --model-provider anthropic --model-name claude-3-5-haiku-latest
-```
-
-### 📊 Model Comparison
-
-#### Google Gemini
-- **gemini-2.5-pro**: Free, excellent analysis quality
-- **gemini-2.5-flash**: Free, fastest generation, good for quick portfolios
-
-#### Anthropic Claude
-- **claude-sonnet-4-0**: Paid, advanced reasoning, premium quality
-- **claude-3-5-haiku-latest**: Paid, cheaper option, good quality
-
-#### OpenAI GPT
-- **gpt-4.1**: Paid, reliable performance, no reasoning
-- **gpt-4.1-nano**: Free tier available, basic capabilities
-- **o4-mini**: Paid, reasoning capabilities, good for complex analysis
-- **gpt-4.1-mini**: Free tier available, minimal capabilities
-
-## API Tokens Setup
-
-### Google Gemini API Key (Recommended):
-1. Go to [Google AI Studio](https://aistudio.google.com/)
-2. Create a new API key
-3. Set as `GEMINI_API_KEY` environment variable
-
-### Anthropic API Key:
-1. Sign up at [Anthropic Console](https://console.anthropic.com/)
-2. Generate an API key
-3. Set as `ANTHROPIC_API_KEY` environment variable
-
-### OpenAI API Key:
-1. Sign up at [OpenAI Platform](https://platform.openai.com/)
-2. Generate an API key
-3. Set as `OPENAI_API_KEY` environment variable
-
-### GitHub Token:
-1. Go to GitHub Settings > Developer settings > Personal access tokens
-2. Generate a token with `repo` scope for private repos, or `public_repo` for public only
-3. Set as `GITHUB_TOKEN` environment variable
-
-### GitLab Token:
-1. Go to GitLab User Settings > Access Tokens
-2. Create a token with `read_repository` scope
-3. Set as `GITLAB_TOKEN` environment variable
-
-
-## Output
-
-The script generates the following files:
-- **Stage 1**: `portfolio_data_[timestamp].json` - Raw repository data
-- **Stage 2**: `portfolio_summary_[timestamp].md` - AI-generated comprehensive portfolio summary with top 5 projects and lines of code estimation
-
-## Features
-
-### 🚀 **Core Functionality**
-- Fetches both public and private repositories
-- Supports GitHub and GitLab (including self-hosted)
-- Extracts comprehensive metrics: stars, forks, languages, commit history
-- Handles rate limiting and pagination automatically
-- Saves results with timestamps
-
-### 🤖 **AI-Powered Analysis**
-- **Professional portfolio summaries**: Comprehensive analysis using Anthropic API
-- **Top 5 projects highlight**: AI identifies and features your most significant projects
-- **Lines of code estimation**: Automatically calculates approximate lines of code across all projects
-- **Interview preparation**: AI-generated talking points and project highlights
-
-### ⚙️ **Advanced Controls**
-- **Stage-based execution**: Run data collection and analysis separately
-- **Platform selection**: Analyze only GitHub or only GitLab repositories
-- **Configurable commit threshold**: Filter projects by minimum user commits
-- **User-controlled commit limits**: `--max-commits` option for managing JSON size
-- **Smart data filtering**: Conditional inclusion based on value (stars/forks > 0, non-empty content)
-
-### 🔧 **Technical Features**
-- **Improved commit detection**: Better matching across multiple email addresses
-- **Duplicate filtering**: Ignores identical commit messages for cleaner analysis
-- **Total commit tracking**: Shows all commits in repository from all users
-- **Enhanced debugging**: Detailed output for troubleshooting
-- **Professional error handling**: Informative messages and troubleshooting tips
-
-## Command Line Options
+### Command Line Options
 
 | Option | Description | Default |
 |--------|-------------|---------|
 | `--github-username` | GitHub username (optional if using token) | None |
 | `--gitlab-username` | GitLab username (optional if using token) | None |
-| `--use-existing` | Use most recent portfolio data file instead of fetching new data | False |
-| `--stage` | Run specific stage: 1=get JSON data, 2=analyze data | Both stages |
-| `--min-commits` | Minimum user commits required for a project to be included | 1 |
-| `--platform` | Analyze only specific platform: `github` or `gitlab` | Both platforms |
-| `--max-commits` | Maximum commits per project to include in JSON output | All commits |
+| `--platform` | Analyze only specific platform (`github` or `gitlab`) | Both |
+| `--use-existing` | Use most recent data file instead of fetching new | False |
+| `--stage` | Run specific stage: `1`=data collection, `2`=analysis | Both |
+| `--min-commits` | Minimum user commits required for inclusion | 1 |
+| `--max-commits` | Maximum commits per project in JSON | All |
 | `--model-provider` | AI provider: `anthropic`, `openai`, `google` | `google` |
-| `--model-name` | Specific model name to use | `gemini-2.5-pro` |
+| `--model-name` | Specific model name | Provider default |
+| `--debug` | Enable debug logging | False |
+| `--check-config` | Check configuration and exit | False |
 
-## Output Files Explained
+## 🏗️ Architecture
 
-### Portfolio Summary (`portfolio_summary_[timestamp].md`)
-A comprehensive portfolio overview including:
-- Executive summary of developer profile with estimated lines of code
-- Top 5 featured projects with detailed analysis
-- Technical skills and expertise analysis ranked by proficiency
-- Development practices and code quality assessment
-- Professional growth timeline
-- Portfolio presentation recommendations
+The application follows a clean, modular architecture:
 
-### Raw Data (`portfolio_data_[timestamp].json`)
-Complete structured data including:
-- All repository metadata (conditionally filtered)
-- Commit history and statistics
-- Technology usage and file structure
-- Perfect for further analysis or custom reporting
-
-## Troubleshooting
-
-### Projects showing 0 commits but you have commits
-
-This usually happens when your commit author email doesn't match your GitHub/GitLab account email. The script now:
-
-1. **Fetches multiple email addresses**: Gets all emails associated with your GitHub account
-2. **Tracks usernames**: Matches commits by username as well as email
-3. **Provides debug output**: Shows what emails/names are being used for matching
-
-**Solutions:**
-- Ensure your git config email matches your GitHub/GitLab account: `git config --global user.email "your@email.com"`
-- Check the debug output to see what emails are being tracked
-- Use `--min-commits 0` to include all projects regardless of commit count
-
-### JSON too large for AI analysis
-
-If you get "prompt is too long" errors, you have several options:
-
-1. **Limit commits per project**: Use `--max-commits 10` to include only the 10 most recent commits per project
-2. **Reduce projects**: Use `--min-commits 5` to include only projects with substantial contributions
-3. **Platform selection**: Use `--platform github` or `--platform gitlab` to analyze only one platform
-
-**Example for large portfolios:**
-```bash
-python portfolio_generator.py --max-commits 15 --min-commits 3
+```
+src/
+├── ai_providers/           # AI provider implementations
+│   ├── anthropic_provider.py
+│   ├── openai_provider.py
+│   ├── gemini_provider.py
+│   └── factory.py
+├── repository_managers/    # Repository platform handlers
+│   ├── github_manager.py
+│   └── gitlab_manager.py
+├── config/                 # Configuration management
+│   ├── config_manager.py
+│   └── portfolio_config.py
+├── utils/                  # Utility functions
+│   ├── file_analyzer.py
+│   ├── data_processor.py
+│   └── logger.py
+└── portfolio_generator.py  # Main application
 ```
 
-**Note:** The portfolio summary now includes estimated lines of code and highlights your top 5 most significant projects.
+### Key Design Principles
+- **Single Responsibility**: Each module has one clear purpose
+- **Open/Closed**: Easy to extend without modifying existing code
+- **Dependency Inversion**: High-level modules depend on abstractions
+- **Error Handling**: Comprehensive exception handling and logging
 
-### No projects found
+For detailed architecture documentation, see [ARCHITECTURE.md](ARCHITECTURE.md).
 
-**Check:**
-1. Your API tokens have correct permissions (`repo` scope for GitHub, `read_repository` for GitLab)
-2. The debug output shows your user info was retrieved correctly
-3. You're not using `--platform` to restrict to a platform you don't have repos on
+## 🤖 AI Models & Providers
 
-### Rate limiting issues
+### 🎯 Recommended Models
 
-- The script automatically handles rate limiting with delays
-- GitHub tokens provide much higher rate limits than anonymous access
-- GitLab tokens are required for private repos and higher limits
+| Provider | Model | Cost | Reasoning | Best For |
+|----------|-------|------|-----------|----------|
+| **Google** | `gemini-2.5-pro` | ✅ Free | ❌ No | **Default choice** - Excellent free analysis |
+| **Google** | `gemini-2.5-flash` | ✅ Free | ❌ No | Fastest option |
+| **Anthropic** | `claude-3-5-sonnet-latest` | 💰 Paid | ❌ No | High-quality analysis |
+| **Anthropic** | `claude-3-5-haiku-latest` | 💰 Paid | ❌ No | Cheaper Claude option |
+| **OpenAI** | `gpt-4.1-nano` | 🆓 Free tier | ❌ No | Good free option |
+| **OpenAI** | `o4-mini` | 💰 Paid | ✅ Yes | Reasoning capabilities |
 
-#### Data Filtering Rules:
-- **Stars/Forks**: Only included if > 0
-- **Description**: Only included if not empty
-- **README**: Only included if not empty
-- **Watchers/Subscribers/Network counts**: Only included if > 0
-- **Total commits**: Shows commits from all users (not just authenticated user)
-- **Excluded attributes**: `has_issues`, `has_projects`, `has_wiki`, `has_pages`, `default_branch`, `open_issues_count`, `language`
+### Quick Start Recommendations
+
+**For beginners or cost-conscious users:**
+```bash
+python portfolio_generator_cli.py  # Uses free Gemini 2.5 Pro
+```
+
+**For premium quality:**
+```bash
+python portfolio_generator_cli.py --model-provider anthropic --model-name claude-3-5-sonnet-latest
+```
+
+**For fastest results:**
+```bash
+python portfolio_generator_cli.py --model-provider google --model-name gemini-2.5-flash
+```
+
+## 🔑 API Setup
+
+### Google Gemini (Recommended)
+1. Visit [Google AI Studio](https://aistudio.google.com/)
+2. Create a new API key
+3. Set as `GEMINI_API_KEY` environment variable
+
+### Anthropic Claude
+1. Sign up at [Anthropic Console](https://console.anthropic.com/)
+2. Generate an API key
+3. Set as `ANTHROPIC_API_KEY` environment variable
+
+### OpenAI GPT
+1. Sign up at [OpenAI Platform](https://platform.openai.com/)
+2. Generate an API key
+3. Set as `OPENAI_API_KEY` environment variable
+
+### GitHub Token
+1. Go to GitHub Settings > Developer settings > Personal access tokens
+2. Generate token with `repo` scope (or `public_repo` for public only)
+3. Set as `GITHUB_TOKEN` environment variable
+
+### GitLab Token
+1. Go to GitLab User Settings > Access Tokens
+2. Create token with `read_repository` scope
+3. Set as `GITLAB_TOKEN` environment variable
+
+## 📊 Output
+
+### Generated Files
+
+1. **`portfolio_data_[timestamp].json`** - Raw repository data
+   - Complete repository metadata
+   - Commit history and statistics
+   - Technology usage analysis
+   - Perfect for further analysis
+
+2. **`portfolio_summary_[timestamp].md`** - AI-generated portfolio
+   - Executive summary with code metrics
+   - Top 5 featured projects
+   - Technical skills analysis
+   - Development practices assessment
+   - Professional growth timeline
+   - Interview preparation recommendations
+
+### Example Output Structure
+
+```markdown
+# Portfolio Summary
+
+## Executive Summary
+- Developer profile with estimated lines of code
+- Years of experience based on project timeline
+- Primary technical focus areas
+
+## Top 5 Featured Projects
+- Detailed project analysis
+- Technical stack and complexity
+- Contribution levels and impact
+
+## Technical Skills & Expertise
+- Programming languages ranked by proficiency
+- Frameworks and libraries with context
+- Architecture patterns demonstrated
+
+[... and more sections]
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**No projects found:**
+- Check API tokens have correct permissions
+- Verify user info is retrieved correctly
+- Ensure commit email matches account email
+
+**Zero commits detected:**
+- Check git config email: `git config --global user.email`
+- Use `--min-commits 0` to include all projects
+- Check debug output for email matching
+
+**JSON too large:**
+- Use `--max-commits 10` to limit commits per project
+- Use `--min-commits 5` to filter projects
+- Use `--platform github` or `--platform gitlab`
+
+**Rate limiting:**
+- Script handles rate limiting automatically
+- Use tokens for higher rate limits
+- Consider using `--debug` for detailed output
+
+### Debug Mode
+
+Enable debug mode for detailed troubleshooting:
+
+```bash
+python portfolio_generator_cli.py --debug
+```
+
+## 🤝 Contributing
+
+We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.md) for details.
+
+### Quick Contributing Steps
+1. Fork the repository
+2. Create a feature branch: `git checkout -b feature/amazing-feature`
+3. Make your changes following our coding standards
+4. Add tests for new functionality
+5. Submit a pull request
+
+## 📄 License
+
+This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+
+## 📚 Documentation
+
+- [Architecture Overview](ARCHITECTURE.md)
+- [Contributing Guidelines](CONTRIBUTING.md)
+- [Changelog](CHANGELOG.md)
+- [License](LICENSE)
+
+## 🙏 Acknowledgments
+
+- Thanks to all contributors who help improve this project
+- Built with love for the open-source community
+- Special thanks to the AI providers for their excellent APIs
+
+---
+
+**Made with ❤️ for developers, by developers**
+
+For support, questions, or feature requests, please [open an issue](https://github.com/yourusername/portfolio-generator/issues).
