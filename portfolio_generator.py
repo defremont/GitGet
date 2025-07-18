@@ -16,12 +16,13 @@ from collections import Counter
 import glob
 
 class PortfolioGenerator:
-    def __init__(self, min_commits=1):
+    def __init__(self, min_commits=1, max_commits_per_project=None):
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.gitlab_token = os.getenv('GITLAB_TOKEN')
         self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         self.gitlab_url = os.getenv('GITLAB_URL', 'https://gitlab.com')
         self.min_commits = min_commits
+        self.max_commits_per_project = max_commits_per_project  # None means no limit
         self.total_user_commits = 0
         
         if not self.anthropic_key:
@@ -239,8 +240,6 @@ class PortfolioGenerator:
         # Fetch all user commits (paginated)
         try:
             user_commits = []
-            seen_messages = set()  # Track seen messages across all pages
-            total_user_commits_found = 0  # Track total user commits before deduplication
             total_commits_in_repo = 0  # Track total commits from all users
             page = 1
             while True:
@@ -255,26 +254,21 @@ class PortfolioGenerator:
                 # Count all commits in the repository
                 total_commits_in_repo += len(commits_data)
                 
-                # Filter commits to only include user commits and track seen messages
+                # Filter commits to only include user commits
                 for commit in commits_data:
                     author_email = commit['commit']['author'].get('email', '').lower()
                     author_name = commit['commit']['author']['name'].lower()
                     commit_message = commit['commit']['message'].strip()
                     
-                    # Count all user commits (before deduplication)
+                    # Include all user commits (no deduplication at this stage)
                     if self._is_user_commit(author_email, author_name):
-                        total_user_commits_found += 1
-                        
-                        # Only include if message hasn't been seen
-                        if commit_message not in seen_messages:
-                            seen_messages.add(commit_message)
-                            user_commits.append({
-                                'message': commit_message,
-                                'date': commit['commit']['author']['date'],
-                                'author': commit['commit']['author']['name'],
-                                'author_email': commit['commit']['author'].get('email', ''),
-                                'sha': commit['sha'][:8]
-                            })
+                        user_commits.append({
+                            'message': commit_message,
+                            'date': commit['commit']['author']['date'],
+                            'author': commit['commit']['author']['name'],
+                            'author_email': commit['commit']['author'].get('email', ''),
+                            'sha': commit['sha'][:8]
+                        })
                 
                 page += 1
                 time.sleep(0.1)
@@ -286,14 +280,9 @@ class PortfolioGenerator:
             details['user_commits'] = user_commits
             details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
             
-            # Count user commits and show deduplication stats
+            # Count user commits
             details['user_commits_count'] = len(user_commits)
             details['total_commits_fetched'] = total_commits_in_repo  # Total commits from all users
-            
-            # Show deduplication stats if any duplicates were found
-            duplicates_filtered = total_user_commits_found - len(user_commits)
-            if duplicates_filtered > 0:
-                print(f"    DEBUG: Filtered {duplicates_filtered} duplicate commit messages")
                 
         except Exception as e:
             print(f"Error fetching commits for {repo_full_name}: {e}")
@@ -487,8 +476,6 @@ class PortfolioGenerator:
         # Fetch all user commits (paginated)
         try:
             user_commits = []
-            seen_messages = set()  # Track seen messages across all pages
-            total_user_commits_found = 0  # Track total user commits before deduplication
             total_commits_in_repo = 0  # Track total commits from all users
             page = 1
             while True:
@@ -503,26 +490,21 @@ class PortfolioGenerator:
                 # Count all commits in the repository
                 total_commits_in_repo += len(commits_data)
                 
-                # Filter commits to only include user commits and track seen messages
+                # Filter commits to only include user commits
                 for commit in commits_data:
                     author_email = commit['author_email'].lower()
                     author_name = commit['author_name'].lower()
                     commit_message = commit['message'].strip()
                     
-                    # Count all user commits (before deduplication)
+                    # Include all user commits (no deduplication at this stage)
                     if self._is_user_commit(author_email, author_name):
-                        total_user_commits_found += 1
-                        
-                        # Only include if message hasn't been seen
-                        if commit_message not in seen_messages:
-                            seen_messages.add(commit_message)
-                            user_commits.append({
-                                'message': commit_message,
-                                'date': commit['created_at'],
-                                'author': commit['author_name'],
-                                'author_email': commit['author_email'],
-                                'sha': commit['id'][:8]
-                            })
+                        user_commits.append({
+                            'message': commit_message,
+                            'date': commit['created_at'],
+                            'author': commit['author_name'],
+                            'author_email': commit['author_email'],
+                            'sha': commit['id'][:8]
+                        })
                 
                 page += 1
                 time.sleep(0.1)
@@ -534,14 +516,9 @@ class PortfolioGenerator:
             details['user_commits'] = user_commits
             details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
             
-            # Count user commits and show deduplication stats
+            # Count user commits
             details['user_commits_count'] = len(user_commits)
             details['total_commits_fetched'] = total_commits_in_repo  # Total commits from all users
-            
-            # Show deduplication stats if any duplicates were found
-            duplicates_filtered = total_user_commits_found - len(user_commits)
-            if duplicates_filtered > 0:
-                print(f"    DEBUG: Filtered {duplicates_filtered} duplicate commit messages")
                 
         except Exception as e:
             print(f"Error fetching commits for project {project_id}: {e}")
@@ -620,9 +597,9 @@ class PortfolioGenerator:
         """Clean project data by removing unwanted attributes and simplifying user_commits"""
         cleaned_project = project.copy()
         
-        # Remove unwanted attributes
+        # Remove unwanted attributes and large data structures
         attrs_to_remove = [
-            'files',
+            'files',  # Remove file lists (can be very large)
             'meets_commit_threshold',
             'topics',
             'is_fork',
@@ -634,26 +611,108 @@ class PortfolioGenerator:
         for attr in attrs_to_remove:
             cleaned_project.pop(attr, None)
         
-        # Remove folders from folder_structure if it exists
+        # Simplify folder_structure to reduce JSON size
         if 'folder_structure' in cleaned_project and isinstance(cleaned_project['folder_structure'], dict):
-            cleaned_project['folder_structure'].pop('folders', None)
+            folder_structure = cleaned_project['folder_structure']
+            
+            # Remove folders list (can be very large)
+            folder_structure.pop('folders', None)
+            
+            # Limit file_types to top 5 most common
+            if 'file_types' in folder_structure and isinstance(folder_structure['file_types'], dict):
+                file_types = folder_structure['file_types']
+                # Keep only top 5 file types
+                sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:5]
+                folder_structure['file_types'] = dict(sorted_types)
         
-        # Clean user_commits to only include message and date
+        # Keep README content as-is (no truncation)
+        # Keep all languages (no limitation)
+        
+        # Clean user_commits with optional size reduction for JSON
         if 'user_commits' in cleaned_project and isinstance(cleaned_project['user_commits'], list):
             cleaned_commits = []
-            for commit in cleaned_project['user_commits']:
+            seen_messages = set()  # Track seen messages to filter duplicates
+            
+            # Sort commits by date (most recent first)
+            commits_list = cleaned_project['user_commits']
+            if commits_list:
+                # Sort by date (most recent first)
+                try:
+                    commits_list = sorted(commits_list, key=lambda x: x.get('date', ''), reverse=True)
+                except:
+                    pass  # If sorting fails, use original order
+                
+                # Apply user-specified commit limit if set
+                if self.max_commits_per_project is not None:
+                    commits_list = commits_list[:self.max_commits_per_project]
+                    print(f"    DEBUG: Limited to {self.max_commits_per_project} most recent commits per user request")
+            
+            for commit in commits_list:
                 if isinstance(commit, dict):
-                    cleaned_commit = {
-                        'message': commit.get('message', ''),
-                        'date': commit.get('date', '')
-                    }
-                    cleaned_commits.append(cleaned_commit)
+                    message = commit.get('message', '').strip()
+                    
+                    # Keep original commit message length (no truncation)
+                    # Only include if message hasn't been seen (duplicate filtering for JSON size)
+                    if message not in seen_messages:
+                        seen_messages.add(message)
+                        cleaned_commit = {
+                            'message': message,
+                            'date': commit.get('date', '')
+                        }
+                        cleaned_commits.append(cleaned_commit)
+            
             cleaned_project['user_commits'] = cleaned_commits
+            
+            # Update user_commits_count to reflect the deduplicated count in JSON
+            # But keep original count for filtering logic
+            original_count = cleaned_project.get('user_commits_count', 0)
+            deduplicated_count = len(cleaned_commits)
+            
+            # Add debug info about filtering
+            if original_count > deduplicated_count:
+                print(f"    DEBUG: Filtered {original_count - deduplicated_count} duplicate commit messages for JSON output")
+            
+            # Keep original count for threshold logic, but note deduplicated count
+            cleaned_project['user_commits_count'] = original_count
+            cleaned_project['user_commits_deduplicated_count'] = deduplicated_count
         
         # Note: Conditional attributes (stars, forks, description, readme, watchers_count, etc.) 
         # are already handled in the processing methods and only included if they meet criteria
         
         return cleaned_project
+    
+    def estimate_json_size(self, projects: List[Dict[str, Any]]) -> int:
+        """Estimate JSON size in characters (approximates tokens)"""
+        try:
+            json_str = json.dumps(projects, indent=2)
+            return len(json_str)
+        except:
+            return 0
+    
+    def reduce_json_size_further(self, projects: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Further reduce JSON size if it's still too large by simplifying folder structure"""
+        print("    WARNING: JSON size is still large. Simplifying folder structure only.")
+        print("    Consider using --max-commits option to limit commits per project.")
+        
+        for project in projects:
+            # Only reduce folder structure, respect user preferences for commits/README/languages
+            if 'folder_structure' in project:
+                # Keep only essential info
+                folder_structure = project['folder_structure']
+                if isinstance(folder_structure, dict):
+                    essential_structure = {
+                        'project_type': folder_structure.get('project_type', 'general'),
+                        'total_files': folder_structure.get('total_files', 0)
+                    }
+                    # Keep only top 3 file types
+                    if 'file_types' in folder_structure:
+                        file_types = folder_structure['file_types']
+                        if isinstance(file_types, dict) and file_types:
+                            sorted_types = sorted(file_types.items(), key=lambda x: x[1], reverse=True)[:3]
+                            essential_structure['file_types'] = dict(sorted_types)
+                    project['folder_structure'] = essential_structure
+        
+        return projects
     
     def process_github_repo(self, repo: Dict[str, Any]) -> Dict[str, Any]:
         """Process GitHub repository data with detailed information"""
@@ -1071,6 +1130,17 @@ Format in clean, professional markdown suitable for portfolio presentation and i
         total_commits = sum(project.get('user_commits_count', 0) for project in projects_data)
         print(f"Analyzing {len(projects_data)} projects with {total_commits} total user commits...")
         
+        # Estimate JSON size and reduce if necessary
+        json_size = self.estimate_json_size(projects_data)
+        print(f"Estimated JSON size: {json_size:,} characters")
+        
+        # If JSON is too large, apply further reduction
+        if json_size > 150000:  # Conservative limit to stay under 200k tokens
+            print("JSON size is large, applying further reduction...")
+            projects_data = self.reduce_json_size_further(projects_data)
+            new_size = self.estimate_json_size(projects_data)
+            print(f"Reduced JSON size to: {new_size:,} characters")
+        
         print("Generating portfolio summary...")
         summary = self.generate_summary(projects_data)
         
@@ -1129,11 +1199,12 @@ if __name__ == "__main__":
     parser.add_argument("--stage", type=int, choices=[1, 2], help="Run specific stage: 1=get JSON data, 2=analyze data (default: run both)")
     parser.add_argument("--min-commits", type=int, default=1, help="Minimum user commits required for a project to be included (default: 1)")
     parser.add_argument("--platform", choices=['github', 'gitlab'], help="Analyze only specific platform in stage 1 (default: analyze both)")
+    parser.add_argument("--max-commits", type=int, help="Maximum commits per project to include in JSON (default: all commits)")
     
     args = parser.parse_args()
     
     try:
-        generator = PortfolioGenerator(min_commits=args.min_commits)
+        generator = PortfolioGenerator(min_commits=args.min_commits, max_commits_per_project=args.max_commits)
         generator.run(args.github_username, args.gitlab_username, args.use_existing, args.stage, args.platform)
     except Exception as e:
         print(f"Error: {e}")

@@ -92,6 +92,12 @@ python portfolio_generator.py --min-commits 5
 ```
 Only includes projects where you have at least 5 commits (default: 1)
 
+#### Maximum Commits Per Project (JSON Size Control)
+```bash
+python portfolio_generator.py --max-commits 10
+```
+Limits commits per project in JSON to most recent N commits (default: all commits)
+
 #### Platform Selection
 ```bash
 # Analyze only GitHub repositories
@@ -103,7 +109,7 @@ python portfolio_generator.py --platform gitlab
 
 #### Combined Example
 ```bash
-python portfolio_generator.py --github-username myuser --min-commits 10 --stage 1
+python portfolio_generator.py --github-username myuser --min-commits 10 --max-commits 20 --stage 1
 ```
 
 ## API Tokens Setup
@@ -159,6 +165,7 @@ The script generates three files:
 | `--stage` | Run specific stage: 1=get JSON data, 2=analyze data | Both stages |
 | `--min-commits` | Minimum user commits required for a project to be included | 1 |
 | `--platform` | Analyze only specific platform: `github` or `gitlab` | Both platforms |
+| `--max-commits` | Maximum commits per project to include in JSON output | All commits |
 
 ## Output Files Explained
 
@@ -184,6 +191,47 @@ Complete structured data including:
 - Commit history and statistics
 - Technology usage and file structure
 - Perfect for further analysis or custom reporting
+
+## Troubleshooting
+
+### Projects showing 0 commits but you have commits
+
+This usually happens when your commit author email doesn't match your GitHub/GitLab account email. The script now:
+
+1. **Fetches multiple email addresses**: Gets all emails associated with your GitHub account
+2. **Tracks usernames**: Matches commits by username as well as email
+3. **Provides debug output**: Shows what emails/names are being used for matching
+
+**Solutions:**
+- Ensure your git config email matches your GitHub/GitLab account: `git config --global user.email "your@email.com"`
+- Check the debug output to see what emails are being tracked
+- Use `--min-commits 0` to include all projects regardless of commit count
+
+### JSON too large for AI analysis
+
+If you get "prompt is too long" errors, you have several options:
+
+1. **Limit commits per project**: Use `--max-commits 10` to include only the 10 most recent commits per project
+2. **Reduce projects**: Use `--min-commits 5` to include only projects with substantial contributions
+3. **Platform selection**: Use `--platform github` or `--platform gitlab` to analyze only one platform
+
+**Example for large portfolios:**
+```bash
+python portfolio_generator.py --max-commits 15 --min-commits 3
+```
+
+### No projects found
+
+**Check:**
+1. Your API tokens have correct permissions (`repo` scope for GitHub, `read_repository` for GitLab)
+2. The debug output shows your user info was retrieved correctly
+3. You're not using `--platform` to restrict to a platform you don't have repos on
+
+### Rate limiting issues
+
+- The script automatically handles rate limiting with delays
+- GitHub tokens provide much higher rate limits than anonymous access
+- GitLab tokens are required for private repos and higher limits
 
 #### Data Filtering Rules:
 - **Stars/Forks**: Only included if > 0
