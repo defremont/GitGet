@@ -1,2 +1,5 @@
 portfolio_data_*.json
 portfolio_summary_*.md
+
+# Python package metadata
+*.egg-info/
