@@ -14,21 +14,132 @@ import anthropic
 import base64
 from collections import Counter
 import glob
+from abc import ABC, abstractmethod
+
+# Optional imports for different AI providers
+try:
+    import openai
+except ImportError:
+    openai = None
+
+try:
+    import google.generativeai as genai
+except ImportError:
+    genai = None
+
+class AIProvider(ABC):
+    """Abstract base class for AI providers"""
+    
+    @abstractmethod
+    def generate_summary(self, prompt: str) -> str:
+        """Generate a summary using the AI model"""
+        pass
+    
+    @abstractmethod
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get information about the model"""
+        pass
+
+class AnthropicProvider(AIProvider):
+    """Anthropic Claude provider"""
+    
+    def __init__(self, api_key: str, model: str = "claude-3-5-haiku-latest"):
+        self.client = anthropic.Anthropic(api_key=api_key)
+        self.model = model
+    
+    def generate_summary(self, prompt: str) -> str:
+        try:
+            response = self.client.messages.create(
+                model=self.model,
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text
+        except Exception as e:
+            raise Exception(f"Anthropic API error: {e}")
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        return {
+            "provider": "anthropic",
+            "model": self.model,
+            "has_reasoning": self.model == "claude-sonnet-4-0",
+            "is_free": False,
+            "is_cheaper": self.model == "claude-3-5-haiku-latest"
+        }
+
+class OpenAIProvider(AIProvider):
+    """OpenAI GPT provider"""
+    
+    def __init__(self, api_key: str, model: str = "gpt-4.1-nano"):
+        if openai is None:
+            raise ImportError("OpenAI package not installed. Install with: pip install openai")
+        self.client = openai.OpenAI(api_key=api_key)
+        self.model = model
+    
+    def generate_summary(self, prompt: str) -> str:
+        try:
+            response = self.client.chat.completions.create(
+                model=self.model,
+                messages=[{"role": "user", "content": prompt}],
+                max_tokens=4000
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            raise Exception(f"OpenAI API error: {e}")
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        return {
+            "provider": "openai",
+            "model": self.model,
+            "has_reasoning": self.model == "o4-mini",
+            "is_free": self.model in ["gpt-4.1-nano", "gpt-4.1-mini"],
+            "is_cheaper": self.model in ["gpt-4.1-nano", "gpt-4.1-mini"]
+        }
+
+class GeminiProvider(AIProvider):
+    """Google Gemini provider"""
+    
+    def __init__(self, api_key: str, model: str = "gemini-2.5-pro"):
+        if genai is None:
+            raise ImportError("Google Generative AI package not installed. Install with: pip install google-generativeai")
+        genai.configure(api_key=api_key)
+        self.model = model
+        self.client = genai.GenerativeModel(model)
+    
+    def generate_summary(self, prompt: str) -> str:
+        try:
+            response = self.client.generate_content(
+                prompt,
+                generation_config=genai.types.GenerationConfig(
+                    max_output_tokens=4000,
+                    temperature=0.7
+                )
+            )
+            return response.text
+        except Exception as e:
+            raise Exception(f"Gemini API error: {e}")
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        return {
+            "provider": "google",
+            "model": self.model,
+            "has_reasoning": False,
+            "is_free": True,
+            "is_cheaper": self.model == "gemini-2.5-flash"
+        }
 
 class PortfolioGenerator:
-    def __init__(self, min_commits=1, max_commits_per_project=None):
+    def __init__(self, min_commits=1, max_commits_per_project=None, model_provider=None, model_name=None):
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.gitlab_token = os.getenv('GITLAB_TOKEN')
-        self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         self.gitlab_url = os.getenv('GITLAB_URL', 'https://gitlab.com')
         self.min_commits = min_commits
         self.max_commits_per_project = max_commits_per_project  # None means no limit
         self.total_user_commits = 0
         
-        if not self.anthropic_key:
-            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+        # AI Provider configuration
+        self.ai_provider = self._setup_ai_provider(model_provider, model_name)
         
-        self.anthropic_client = anthropic.Anthropic(api_key=self.anthropic_key)
         self.user_email = None
         self.user_name = None
         self.user_emails = set()  # Track multiple possible emails
@@ -127,6 +238,39 @@ class PortfolioGenerator:
             return True
         
         return False
+    
+    def _setup_ai_provider(self, provider: str = None, model: str = None) -> AIProvider:
+        """Set up the AI provider based on configuration"""
+        # Default to gemini-2.5-pro if no provider specified
+        if provider is None:
+            provider = "google"
+        if model is None:
+            model = "gemini-2.5-pro"
+        
+        # Get API keys
+        anthropic_key = os.getenv('ANTHROPIC_API_KEY')
+        openai_key = os.getenv('OPENAI_API_KEY')
+        gemini_key = os.getenv('GEMINI_API_KEY')
+        
+        # Setup provider
+        if provider.lower() == "anthropic":
+            if not anthropic_key:
+                raise ValueError("ANTHROPIC_API_KEY environment variable is required for Anthropic provider")
+            return AnthropicProvider(anthropic_key, model)
+        elif provider.lower() == "openai":
+            if not openai_key:
+                raise ValueError("OPENAI_API_KEY environment variable is required for OpenAI provider")
+            return OpenAIProvider(openai_key, model)
+        elif provider.lower() == "google":
+            if not gemini_key:
+                raise ValueError("GEMINI_API_KEY environment variable is required for Google provider")
+            return GeminiProvider(gemini_key, model)
+        else:
+            raise ValueError(f"Unsupported AI provider: {provider}. Supported: anthropic, openai, google")
+    
+    def get_model_info(self) -> Dict[str, Any]:
+        """Get information about the current AI model"""
+        return self.ai_provider.get_model_info()
     
     def count_user_commits(self, commits: List[Dict[str, Any]]) -> int:
         """Count commits made by the authenticated user"""
@@ -983,14 +1127,9 @@ Format the response in professional markdown suitable for portfolio presentation
 """
 
         try:
-            response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return response.content[0].text
+            return self.ai_provider.generate_summary(prompt)
         except Exception as e:
-            print(f"Error generating summary with Anthropic API: {e}")
+            print(f"Error generating summary with AI provider: {e}")
             return "Error generating portfolio summary."
     
     
@@ -1122,6 +1261,17 @@ Format the response in professional markdown suitable for portfolio presentation
         """Main execution method with stage support"""
         print("Starting portfolio generation...")
         
+        # Show model info
+        model_info = self.get_model_info()
+        print(f"Using AI Model: {model_info['provider'].upper()} {model_info['model']}")
+        if model_info['is_free']:
+            print("  - Free tier available")
+        if model_info['has_reasoning']:
+            print("  - Has reasoning capabilities")
+        if model_info['is_cheaper']:
+            print("  - Cheaper option")
+        print()
+        
         # Handle stage-specific execution
         if stage == 1:
             print("Running Stage 1 only: Data collection")
@@ -1164,11 +1314,18 @@ if __name__ == "__main__":
     parser.add_argument("--min-commits", type=int, default=1, help="Minimum user commits required for a project to be included (default: 1)")
     parser.add_argument("--platform", choices=['github', 'gitlab'], help="Analyze only specific platform in stage 1 (default: analyze both)")
     parser.add_argument("--max-commits", type=int, help="Maximum commits per project to include in JSON (default: all commits)")
+    parser.add_argument("--model-provider", choices=['anthropic', 'openai', 'google'], default='google', help="AI provider to use (default: google)")
+    parser.add_argument("--model-name", help="Specific model name to use (default: gemini-2.5-pro)")
     
     args = parser.parse_args()
     
     try:
-        generator = PortfolioGenerator(min_commits=args.min_commits, max_commits_per_project=args.max_commits)
+        generator = PortfolioGenerator(
+            min_commits=args.min_commits, 
+            max_commits_per_project=args.max_commits,
+            model_provider=args.model_provider,
+            model_name=args.model_name
+        )
         generator.run(args.github_username, args.gitlab_username, args.use_existing, args.stage, args.platform)
     except Exception as e:
         print(f"Error: {e}")

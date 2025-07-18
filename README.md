@@ -1,10 +1,17 @@
 # Portfolio Generator
 
-A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses the Anthropic API to generate a comprehensive portfolio summary with detailed project analysis. See a output example at `output_example.md`.
+A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses multiple AI providers (Anthropic, OpenAI, Google Gemini) to generate a comprehensive portfolio summary with detailed project analysis. See a output example at `output_example.md`.
 
-🌟 **NEW**: Now includes estimated lines of code and highlights your top 5 projects!
+🌟 **NEW**: Multi-AI provider support with Gemini 2.5 Pro as default! Now includes estimated lines of code and highlights your top 5 projects!
 
 ## Recent Updates
+
+### v2.0.0 - Multi-AI Provider Support
+- **Multiple AI providers**: Support for Anthropic Claude, OpenAI GPT, and Google Gemini
+- **Smart model selection**: Choose from reasoning models, cheaper options, and free tiers
+- **Gemini 2.5 Pro default**: Best free model with excellent analysis capabilities
+- **Model recommendations**: Built-in guidance for choosing the right model for your needs
+- **Backward compatibility**: Existing API keys continue to work
 
 ### v1.6.0 - Enhanced Portfolio Analysis & Simplified Workflow
 - **Lines of code estimation**: Automatically estimates total lines of code across all projects
@@ -41,8 +48,10 @@ pip install -r requirements.txt
 
 2. Set up environment variables:
 ```bash
-# Required
-export ANTHROPIC_API_KEY="your_anthropic_api_key"
+# AI Provider API Keys (choose one or more)
+export GEMINI_API_KEY="your_gemini_api_key"      # Google Gemini (recommended - free)
+export ANTHROPIC_API_KEY="your_anthropic_api_key"  # Anthropic Claude (paid)
+export OPENAI_API_KEY="your_openai_api_key"      # OpenAI GPT (paid/free tiers)
 
 # Optional (for private repos and higher rate limits)
 export GITHUB_TOKEN="your_github_token"
@@ -58,7 +67,13 @@ export GITLAB_URL="https://your-gitlab-instance.com"
 
 #### Using API tokens (recommended for private repos):
 ```bash
+# Default: uses Gemini 2.5 Pro (free)
 python portfolio_generator.py
+
+# Using specific AI provider
+python portfolio_generator.py --model-provider anthropic --model-name claude-3-5-haiku-latest
+python portfolio_generator.py --model-provider openai --model-name gpt-4.1-nano
+python portfolio_generator.py --model-provider google --model-name gemini-2.5-flash
 ```
 
 #### Using usernames (public repos only):
@@ -121,7 +136,76 @@ python portfolio_generator.py --platform gitlab
 python portfolio_generator.py --github-username myuser --min-commits 10 --max-commits 20 --stage 1
 ```
 
+## AI Models & Providers
+
+### 🎯 Recommended Models
+
+| Provider | Model | Cost | Reasoning | Best For |
+|----------|-------|------|-----------|----------|
+| **Google** | `gemini-2.5-pro` | ✅ Free | ❌ No | **Default choice** - Best free model with excellent analysis |
+| **Google** | `gemini-2.5-flash` | ✅ Free | ❌ No | Fastest option for quick generation |
+| **Anthropic** | `claude-sonnet-4-0` | 💰 Paid | ✅ Yes | Premium reasoning capabilities |
+| **Anthropic** | `claude-3-5-haiku-latest` | 💰 Paid | ❌ No | Cheaper Claude option |
+| **OpenAI** | `gpt-4.1` | 💰 Paid | ❌ No | Reliable GPT-4 performance |
+| **OpenAI** | `gpt-4.1-nano` | 🆓 Free tier | ❌ No | Good free option with limits |
+| **OpenAI** | `o4-mini` | 💰 Paid | ✅ Yes | OpenAI's reasoning model |
+| **OpenAI** | `gpt-4.1-mini` | 🆓 Free tier | ❌ No | Basic free option |
+
+### 🚀 Quick Start Recommendations
+
+**For beginners or cost-conscious users:**
+```bash
+# Use default Gemini 2.5 Pro (free and excellent)
+python portfolio_generator.py
+```
+
+**For users wanting faster results:**
+```bash
+python portfolio_generator.py --model-provider google --model-name gemini-2.5-flash
+```
+
+**For premium reasoning capabilities:**
+```bash
+python portfolio_generator.py --model-provider anthropic --model-name claude-sonnet-4-0
+```
+
+**For budget-conscious users with existing credits:**
+```bash
+python portfolio_generator.py --model-provider anthropic --model-name claude-3-5-haiku-latest
+```
+
+### 📊 Model Comparison
+
+#### Google Gemini
+- **gemini-2.5-pro**: Free, excellent analysis quality, no reasoning
+- **gemini-2.5-flash**: Free, fastest generation, good for quick portfolios
+
+#### Anthropic Claude
+- **claude-sonnet-4-0**: Paid, advanced reasoning, premium quality
+- **claude-3-5-haiku-latest**: Paid, cheaper option, good quality
+
+#### OpenAI GPT
+- **gpt-4.1**: Paid, reliable performance, no reasoning
+- **gpt-4.1-nano**: Free tier available, basic capabilities
+- **o4-mini**: Paid, reasoning capabilities, good for complex analysis
+- **gpt-4.1-mini**: Free tier available, minimal capabilities
+
 ## API Tokens Setup
+
+### Google Gemini API Key (Recommended):
+1. Go to [Google AI Studio](https://aistudio.google.com/)
+2. Create a new API key
+3. Set as `GEMINI_API_KEY` environment variable
+
+### Anthropic API Key:
+1. Sign up at [Anthropic Console](https://console.anthropic.com/)
+2. Generate an API key
+3. Set as `ANTHROPIC_API_KEY` environment variable
+
+### OpenAI API Key:
+1. Sign up at [OpenAI Platform](https://platform.openai.com/)
+2. Generate an API key
+3. Set as `OPENAI_API_KEY` environment variable
 
 ### GitHub Token:
 1. Go to GitHub Settings > Developer settings > Personal access tokens
@@ -133,10 +217,6 @@ python portfolio_generator.py --github-username myuser --min-commits 10 --max-co
 2. Create a token with `read_repository` scope
 3. Set as `GITLAB_TOKEN` environment variable
 
-### Anthropic API Key:
-1. Sign up at https://console.anthropic.com/
-2. Generate an API key
-3. Set as `ANTHROPIC_API_KEY` environment variable
 
 ## Output
 
@@ -184,6 +264,8 @@ The script generates the following files:
 | `--min-commits` | Minimum user commits required for a project to be included | 1 |
 | `--platform` | Analyze only specific platform: `github` or `gitlab` | Both platforms |
 | `--max-commits` | Maximum commits per project to include in JSON output | All commits |
+| `--model-provider` | AI provider: `anthropic`, `openai`, `google` | `google` |
+| `--model-name` | Specific model name to use | `gemini-2.5-pro` |
 
 ## Output Files Explained
 
