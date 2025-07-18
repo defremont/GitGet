@@ -216,7 +216,10 @@ class PortfolioGenerator:
             if readme_response.status_code == 200:
                 readme_data = readme_response.json()
                 readme_content = base64.b64decode(readme_data['content']).decode('utf-8')
-                details['readme'] = readme_content[:2000]  # Limit to 2000 chars
+                readme_content = readme_content.strip()
+                # Only include README if it's not empty
+                if readme_content:
+                    details['readme'] = readme_content[:2000]  # Limit to 2000 chars
             time.sleep(0.1)
         except Exception as e:
             print(f"Error fetching README for {repo_full_name}: {e}")
@@ -238,6 +241,7 @@ class PortfolioGenerator:
             user_commits = []
             seen_messages = set()  # Track seen messages across all pages
             total_user_commits_found = 0  # Track total user commits before deduplication
+            total_commits_in_repo = 0  # Track total commits from all users
             page = 1
             while True:
                 commits_response = requests.get(f'https://api.github.com/repos/{repo_full_name}/commits?per_page=100&page={page}', headers=headers)
@@ -247,6 +251,9 @@ class PortfolioGenerator:
                 commits_data = commits_response.json()
                 if not commits_data:
                     break
+                
+                # Count all commits in the repository
+                total_commits_in_repo += len(commits_data)
                 
                 # Filter commits to only include user commits and track seen messages
                 for commit in commits_data:
@@ -281,7 +288,7 @@ class PortfolioGenerator:
             
             # Count user commits and show deduplication stats
             details['user_commits_count'] = len(user_commits)
-            details['total_commits_fetched'] = len(user_commits)
+            details['total_commits_fetched'] = total_commits_in_repo  # Total commits from all users
             
             # Show deduplication stats if any duplicates were found
             duplicates_filtered = total_user_commits_found - len(user_commits)
@@ -291,6 +298,7 @@ class PortfolioGenerator:
         except Exception as e:
             print(f"Error fetching commits for {repo_full_name}: {e}")
             details['user_commits_count'] = 0
+            details['total_commits_fetched'] = 0
         
         # Fetch languages
         try:
@@ -306,15 +314,21 @@ class PortfolioGenerator:
             repo_response = requests.get(f'https://api.github.com/repos/{repo_full_name}', headers=headers)
             if repo_response.status_code == 200:
                 repo_data = repo_response.json()
-                details['watchers_count'] = repo_data.get('watchers_count', 0)
-                details['network_count'] = repo_data.get('network_count', 0)
-                details['subscribers_count'] = repo_data.get('subscribers_count', 0)
-                details['has_issues'] = repo_data.get('has_issues', False)
-                details['has_projects'] = repo_data.get('has_projects', False)
-                details['has_wiki'] = repo_data.get('has_wiki', False)
-                details['has_pages'] = repo_data.get('has_pages', False)
-                details['default_branch'] = repo_data.get('default_branch', 'main')
-                details['open_issues_count'] = repo_data.get('open_issues_count', 0)
+                
+                # Only include counts if they are > 0
+                watchers_count = repo_data.get('watchers_count', 0)
+                if watchers_count > 0:
+                    details['watchers_count'] = watchers_count
+                
+                network_count = repo_data.get('network_count', 0)
+                if network_count > 0:
+                    details['network_count'] = network_count
+                
+                subscribers_count = repo_data.get('subscribers_count', 0)
+                if subscribers_count > 0:
+                    details['subscribers_count'] = subscribers_count
+                
+                # Ignore these attributes: has_issues, has_projects, has_wiki, has_pages, default_branch, open_issues_count, language
             time.sleep(0.1)
         except Exception as e:
             print(f"Error fetching repo stats for {repo_full_name}: {e}")
@@ -440,14 +454,20 @@ class PortfolioGenerator:
         try:
             readme_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/files/README.md/raw?ref=HEAD', headers=headers)
             if readme_response.status_code == 200:
-                details['readme'] = readme_response.text[:2000]  # Limit to 2000 chars
+                readme_content = readme_response.text.strip()
+                # Only include README if it's not empty
+                if readme_content:
+                    details['readme'] = readme_content[:2000]  # Limit to 2000 chars
             else:
                 # Try other common README names
                 for readme_name in ['README.rst', 'README.txt', 'README']:
                     readme_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/files/{readme_name}/raw?ref=HEAD', headers=headers)
                     if readme_response.status_code == 200:
-                        details['readme'] = readme_response.text[:2000]
-                        break
+                        readme_content = readme_response.text.strip()
+                        # Only include README if it's not empty
+                        if readme_content:
+                            details['readme'] = readme_content[:2000]
+                            break
             time.sleep(0.1)
         except Exception as e:
             print(f"Error fetching README for project {project_id}: {e}")
@@ -469,6 +489,7 @@ class PortfolioGenerator:
             user_commits = []
             seen_messages = set()  # Track seen messages across all pages
             total_user_commits_found = 0  # Track total user commits before deduplication
+            total_commits_in_repo = 0  # Track total commits from all users
             page = 1
             while True:
                 commits_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/commits?per_page=100&page={page}', headers=headers)
@@ -478,6 +499,9 @@ class PortfolioGenerator:
                 commits_data = commits_response.json()
                 if not commits_data:
                     break
+                
+                # Count all commits in the repository
+                total_commits_in_repo += len(commits_data)
                 
                 # Filter commits to only include user commits and track seen messages
                 for commit in commits_data:
@@ -512,7 +536,7 @@ class PortfolioGenerator:
             
             # Count user commits and show deduplication stats
             details['user_commits_count'] = len(user_commits)
-            details['total_commits_fetched'] = len(user_commits)
+            details['total_commits_fetched'] = total_commits_in_repo  # Total commits from all users
             
             # Show deduplication stats if any duplicates were found
             duplicates_filtered = total_user_commits_found - len(user_commits)
@@ -522,6 +546,7 @@ class PortfolioGenerator:
         except Exception as e:
             print(f"Error fetching commits for project {project_id}: {e}")
             details['user_commits_count'] = 0
+            details['total_commits_fetched'] = 0
         
         # Fetch languages (GitLab doesn't have a direct API, so we'll analyze files)
         if 'files' in details:
@@ -625,6 +650,9 @@ class PortfolioGenerator:
                     cleaned_commits.append(cleaned_commit)
             cleaned_project['user_commits'] = cleaned_commits
         
+        # Note: Conditional attributes (stars, forks, description, readme, watchers_count, etc.) 
+        # are already handled in the processing methods and only included if they meet criteria
+        
         return cleaned_project
     
     def process_github_repo(self, repo: Dict[str, Any]) -> Dict[str, Any]:
@@ -633,10 +661,6 @@ class PortfolioGenerator:
             'platform': 'GitHub',
             'name': repo['name'],
             'full_name': repo['full_name'],
-            'description': repo.get('description', ''),
-            'language': repo.get('language', ''),
-            'stars': repo.get('stargazers_count', 0),
-            'forks': repo.get('forks_count', 0),
             'url': repo['html_url'],
             'created_at': repo['created_at'],
             'updated_at': repo['updated_at'],
@@ -645,6 +669,23 @@ class PortfolioGenerator:
             'is_private': repo['private'],
             'size': repo.get('size', 0)
         }
+        
+        # Only include description if it's not null/empty
+        description = repo.get('description')
+        if description:
+            processed_repo['description'] = description
+        
+        # Only include stars if > 0
+        stars = repo.get('stargazers_count', 0)
+        if stars > 0:
+            processed_repo['stars'] = stars
+        
+        # Only include forks if > 0
+        forks = repo.get('forks_count', 0)
+        if forks > 0:
+            processed_repo['forks'] = forks
+        
+        # Ignore language attribute as specified
         
         # Fetch detailed information
         print(f"  Fetching details for {repo['full_name']}...")
@@ -672,10 +713,6 @@ class PortfolioGenerator:
             'platform': 'GitLab',
             'name': repo['name'],
             'full_name': repo['path_with_namespace'],
-            'description': repo.get('description', ''),
-            'language': repo.get('default_branch', ''),
-            'stars': repo.get('star_count', 0),
-            'forks': repo.get('forks_count', 0),
             'url': repo['web_url'],
             'created_at': repo['created_at'],
             'updated_at': repo['last_activity_at'],
@@ -684,6 +721,23 @@ class PortfolioGenerator:
             'is_private': repo['visibility'] == 'private',
             'size': 0  # GitLab doesn't provide size in basic API
         }
+        
+        # Only include description if it's not null/empty
+        description = repo.get('description')
+        if description:
+            processed_repo['description'] = description
+        
+        # Only include stars if > 0
+        stars = repo.get('star_count', 0)
+        if stars > 0:
+            processed_repo['stars'] = stars
+        
+        # Only include forks if > 0
+        forks = repo.get('forks_count', 0)
+        if forks > 0:
+            processed_repo['forks'] = forks
+        
+        # Ignore language attribute as specified
         
         # Fetch detailed information
         print(f"  Fetching details for {repo['path_with_namespace']}...")
@@ -797,6 +851,7 @@ Format the response in professional markdown suitable for portfolio presentation
     def generate_project_details(self, projects: List[Dict[str, Any]]) -> str:
         """Generate detailed project breakdown using Anthropic API"""
         # Sort projects by contribution level (commits, then stars, then recency)
+        # Note: stars and forks are only present if > 0, so we default to 0 for sorting
         sorted_projects = sorted(projects, key=lambda p: (
             p.get('user_commits_count', 0),
             p.get('stars', 0),

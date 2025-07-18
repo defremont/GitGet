@@ -4,6 +4,12 @@ A Python script that scrapes data from your GitHub and GitLab repositories (publ
 
 ## Recent Updates
 
+### v1.3.0 - Smart Data Filtering & Clean JSON Output
+- **Conditional attribute inclusion**: Only includes stars/forks if > 0, descriptions/READMEs if not empty
+- **Total commits tracking**: Shows total commits from all users (not just authenticated user)
+- **Cleaner JSON data**: Removes irrelevant repository flags and empty attributes
+- **Focused analysis**: AI gets cleaner, more meaningful data for better portfolio generation
+
 ### v1.2.0 - Enhanced AI Analysis & Project Details
 - **Comprehensive AI prompts**: Significantly improved AI analysis with professional portfolio writing approach
 - **Project details file**: New detailed project breakdown sorted by contribution level
@@ -140,6 +146,8 @@ The script generates three files:
 - **Duplicate filtering**: Ignores commits with identical messages for cleaner analysis
 - **Professional AI analysis**: Enhanced prompts for comprehensive portfolio and project analysis
 - **Project details file**: Separate detailed breakdown sorted by contribution level with interview prep
+- **Smart data filtering**: Conditional inclusion of attributes based on value (stars/forks > 0, non-empty descriptions/READMEs)
+- **Total commits tracking**: Shows all commits in repository from all users for better context
 
 ## Command Line Options
 
@@ -172,7 +180,15 @@ Detailed project breakdown with:
 
 ### Raw Data (`portfolio_data_[timestamp].json`)
 Complete structured data including:
-- All repository metadata
+- All repository metadata (conditionally filtered)
 - Commit history and statistics
 - Technology usage and file structure
 - Perfect for further analysis or custom reporting
+
+#### Data Filtering Rules:
+- **Stars/Forks**: Only included if > 0
+- **Description**: Only included if not empty
+- **README**: Only included if not empty
+- **Watchers/Subscribers/Network counts**: Only included if > 0
+- **Total commits**: Shows commits from all users (not just authenticated user)
+- **Excluded attributes**: `has_issues`, `has_projects`, `has_wiki`, `has_pages`, `default_branch`, `open_issues_count`, `language`
