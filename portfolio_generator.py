@@ -30,6 +30,8 @@ class PortfolioGenerator:
         self.anthropic_client = anthropic.Anthropic(api_key=self.anthropic_key)
         self.user_email = None
         self.user_name = None
+        self.user_emails = set()  # Track multiple possible emails
+        self.user_names = set()   # Track multiple possible names
         
     def get_user_info(self):
         """Get authenticated user information for commit filtering"""
@@ -39,9 +41,34 @@ class PortfolioGenerator:
                 response = requests.get('https://api.github.com/user', headers=headers)
                 if response.status_code == 200:
                     user_data = response.json()
-                    self.user_email = user_data.get('email')
-                    self.user_name = user_data.get('name') or user_data.get('login')
-                    print(f"GitHub user: {self.user_name} ({self.user_email})")
+                    email = user_data.get('email')
+                    name = user_data.get('name') or user_data.get('login')
+                    login = user_data.get('login')
+                    
+                    if email:
+                        self.user_emails.add(email.lower())
+                        if not self.user_email:
+                            self.user_email = email
+                    
+                    if name:
+                        self.user_names.add(name.lower())
+                        if not self.user_name:
+                            self.user_name = name
+                    
+                    if login:
+                        self.user_names.add(login.lower())
+                    
+                    print(f"GitHub user: {name} ({email}) [login: {login}]")
+                    
+                    # Also try to get user emails from GitHub API
+                    emails_response = requests.get('https://api.github.com/user/emails', headers=headers)
+                    if emails_response.status_code == 200:
+                        emails_data = emails_response.json()
+                        for email_info in emails_data:
+                            if email_info.get('email'):
+                                self.user_emails.add(email_info['email'].lower())
+                        print(f"Found {len(self.user_emails)} GitHub email addresses")
+                        
             except Exception as e:
                 print(f"Error getting GitHub user info: {e}")
         
@@ -51,13 +78,54 @@ class PortfolioGenerator:
                 response = requests.get(f'{self.gitlab_url}/api/v4/user', headers=headers)
                 if response.status_code == 200:
                     user_data = response.json()
-                    if not self.user_email:
-                        self.user_email = user_data.get('email')
-                    if not self.user_name:
-                        self.user_name = user_data.get('name') or user_data.get('username')
-                    print(f"GitLab user: {self.user_name} ({self.user_email})")
+                    email = user_data.get('email')
+                    name = user_data.get('name') or user_data.get('username')
+                    username = user_data.get('username')
+                    
+                    if email:
+                        self.user_emails.add(email.lower())
+                        if not self.user_email:
+                            self.user_email = email
+                    
+                    if name:
+                        self.user_names.add(name.lower())
+                        if not self.user_name:
+                            self.user_name = name
+                    
+                    if username:
+                        self.user_names.add(username.lower())
+                    
+                    print(f"GitLab user: {name} ({email}) [username: {username}]")
+                    
             except Exception as e:
                 print(f"Error getting GitLab user info: {e}")
+        
+        print(f"Debug: Tracking {len(self.user_emails)} emails and {len(self.user_names)} names for commit matching")
+        if self.user_emails:
+            print(f"  Emails: {', '.join(sorted(self.user_emails))}")
+        if self.user_names:
+            print(f"  Names: {', '.join(sorted(self.user_names))}")
+    
+    def _is_user_commit(self, author_email: str, author_name: str) -> bool:
+        """Check if a commit is by the authenticated user using flexible matching"""
+        author_email = author_email.lower()
+        author_name = author_name.lower()
+        
+        # Check against all known emails
+        if author_email and author_email in self.user_emails:
+            return True
+        
+        # Check against all known names
+        if author_name and author_name in self.user_names:
+            return True
+        
+        # Fallback to original logic if no matches found
+        if self.user_email and author_email and self.user_email.lower() == author_email:
+            return True
+        elif self.user_name and author_name and self.user_name.lower() == author_name:
+            return True
+        
+        return False
     
     def count_user_commits(self, commits: List[Dict[str, Any]]) -> int:
         """Count commits made by the authenticated user"""
@@ -69,10 +137,7 @@ class PortfolioGenerator:
             author_email = commit.get('author_email', '').lower()
             author_name = commit.get('author', '').lower()
             
-            # Check if commit is by the user
-            if self.user_email and author_email and self.user_email.lower() == author_email:
-                user_commits += 1
-            elif self.user_name and author_name and self.user_name.lower() == author_name:
+            if self._is_user_commit(author_email, author_name):
                 user_commits += 1
                 
         return user_commits
@@ -171,6 +236,8 @@ class PortfolioGenerator:
         # Fetch all user commits (paginated)
         try:
             user_commits = []
+            seen_messages = set()  # Track seen messages across all pages
+            total_user_commits_found = 0  # Track total user commits before deduplication
             page = 1
             while True:
                 commits_response = requests.get(f'https://api.github.com/repos/{repo_full_name}/commits?per_page=100&page={page}', headers=headers)
@@ -181,21 +248,26 @@ class PortfolioGenerator:
                 if not commits_data:
                     break
                 
-                # Filter commits to only include user commits
+                # Filter commits to only include user commits and track seen messages
                 for commit in commits_data:
                     author_email = commit['commit']['author'].get('email', '').lower()
                     author_name = commit['commit']['author']['name'].lower()
+                    commit_message = commit['commit']['message'].strip()
                     
-                    # Check if commit is by the user
-                    if ((self.user_email and author_email and self.user_email.lower() == author_email) or
-                        (self.user_name and author_name and self.user_name.lower() == author_name)):
-                        user_commits.append({
-                            'message': commit['commit']['message'],
-                            'date': commit['commit']['author']['date'],
-                            'author': commit['commit']['author']['name'],
-                            'author_email': commit['commit']['author'].get('email', ''),
-                            'sha': commit['sha'][:8]
-                        })
+                    # Count all user commits (before deduplication)
+                    if self._is_user_commit(author_email, author_name):
+                        total_user_commits_found += 1
+                        
+                        # Only include if message hasn't been seen
+                        if commit_message not in seen_messages:
+                            seen_messages.add(commit_message)
+                            user_commits.append({
+                                'message': commit_message,
+                                'date': commit['commit']['author']['date'],
+                                'author': commit['commit']['author']['name'],
+                                'author_email': commit['commit']['author'].get('email', ''),
+                                'sha': commit['sha'][:8]
+                            })
                 
                 page += 1
                 time.sleep(0.1)
@@ -207,9 +279,15 @@ class PortfolioGenerator:
             details['user_commits'] = user_commits
             details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
             
-            # Count user commits
+            # Count user commits and show deduplication stats
             details['user_commits_count'] = len(user_commits)
             details['total_commits_fetched'] = len(user_commits)
+            
+            # Show deduplication stats if any duplicates were found
+            duplicates_filtered = total_user_commits_found - len(user_commits)
+            if duplicates_filtered > 0:
+                print(f"    DEBUG: Filtered {duplicates_filtered} duplicate commit messages")
+                
         except Exception as e:
             print(f"Error fetching commits for {repo_full_name}: {e}")
             details['user_commits_count'] = 0
@@ -389,6 +467,8 @@ class PortfolioGenerator:
         # Fetch all user commits (paginated)
         try:
             user_commits = []
+            seen_messages = set()  # Track seen messages across all pages
+            total_user_commits_found = 0  # Track total user commits before deduplication
             page = 1
             while True:
                 commits_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/commits?per_page=100&page={page}', headers=headers)
@@ -399,21 +479,26 @@ class PortfolioGenerator:
                 if not commits_data:
                     break
                 
-                # Filter commits to only include user commits
+                # Filter commits to only include user commits and track seen messages
                 for commit in commits_data:
                     author_email = commit['author_email'].lower()
                     author_name = commit['author_name'].lower()
+                    commit_message = commit['message'].strip()
                     
-                    # Check if commit is by the user
-                    if ((self.user_email and author_email and self.user_email.lower() == author_email) or
-                        (self.user_name and author_name and self.user_name.lower() == author_name)):
-                        user_commits.append({
-                            'message': commit['message'],
-                            'date': commit['created_at'],
-                            'author': commit['author_name'],
-                            'author_email': commit['author_email'],
-                            'sha': commit['id'][:8]
-                        })
+                    # Count all user commits (before deduplication)
+                    if self._is_user_commit(author_email, author_name):
+                        total_user_commits_found += 1
+                        
+                        # Only include if message hasn't been seen
+                        if commit_message not in seen_messages:
+                            seen_messages.add(commit_message)
+                            user_commits.append({
+                                'message': commit_message,
+                                'date': commit['created_at'],
+                                'author': commit['author_name'],
+                                'author_email': commit['author_email'],
+                                'sha': commit['id'][:8]
+                            })
                 
                 page += 1
                 time.sleep(0.1)
@@ -425,9 +510,15 @@ class PortfolioGenerator:
             details['user_commits'] = user_commits
             details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
             
-            # Count user commits
+            # Count user commits and show deduplication stats
             details['user_commits_count'] = len(user_commits)
             details['total_commits_fetched'] = len(user_commits)
+            
+            # Show deduplication stats if any duplicates were found
+            duplicates_filtered = total_user_commits_found - len(user_commits)
+            if duplicates_filtered > 0:
+                print(f"    DEBUG: Filtered {duplicates_filtered} duplicate commit messages")
+                
         except Exception as e:
             print(f"Error fetching commits for project {project_id}: {e}")
             details['user_commits_count'] = 0
@@ -565,6 +656,14 @@ class PortfolioGenerator:
         processed_repo['meets_commit_threshold'] = user_commits >= self.min_commits
         self.total_user_commits += user_commits
         
+        # Debug output for commit counting
+        if user_commits == 0:
+            print(f"    DEBUG: No user commits found for {repo['full_name']}")
+            if not self.user_emails and not self.user_names:
+                print(f"    DEBUG: No user identification info available (check tokens and API access)")
+        else:
+            print(f"    Found {user_commits} user commits")
+        
         return processed_repo
     
     def process_gitlab_repo(self, repo: Dict[str, Any]) -> Dict[str, Any]:
@@ -595,6 +694,14 @@ class PortfolioGenerator:
         user_commits = processed_repo.get('user_commits_count', 0)
         processed_repo['meets_commit_threshold'] = user_commits >= self.min_commits
         self.total_user_commits += user_commits
+        
+        # Debug output for commit counting
+        if user_commits == 0:
+            print(f"    DEBUG: No user commits found for {repo['path_with_namespace']}")
+            if not self.user_emails and not self.user_names:
+                print(f"    DEBUG: No user identification info available (check tokens and API access)")
+        else:
+            print(f"    Found {user_commits} user commits")
         
         return processed_repo
     
@@ -664,7 +771,7 @@ Format the response in markdown for easy reading and presentation.
         print(f"- Raw data: portfolio_data_{timestamp}.json")
         print(f"- Portfolio summary: portfolio_summary_{timestamp}.md")
     
-    def run_stage_1(self, github_username: str = None, gitlab_username: str = None):
+    def run_stage_1(self, github_username: str = None, gitlab_username: str = None, platform: str = None):
         """Stage 1: Get JSON data from repositories"""
         print("Stage 1: Fetching repository data...")
         
@@ -673,8 +780,12 @@ Format the response in markdown for easy reading and presentation.
         
         all_projects = []
         
+        # Check platform restrictions
+        fetch_gitlab = platform is None or platform == 'gitlab'
+        fetch_github = platform is None or platform == 'github'
+        
         # Fetch GitLab repositories
-        if self.gitlab_token or gitlab_username:
+        if fetch_gitlab and (self.gitlab_token or gitlab_username):
             print("Fetching GitLab repositories...")
             gitlab_repos = self.fetch_gitlab_repos(gitlab_username)
             print(f"Processing {len(gitlab_repos)} GitLab repositories with detailed analysis...")
@@ -688,9 +799,11 @@ Format the response in markdown for easy reading and presentation.
                         print(f"  Skipping {repo['path_with_namespace']} - insufficient user commits ({processed_repo.get('user_commits_count', 0)})")
             all_projects.extend(gitlab_projects)
             print(f"Processed {len(gitlab_projects)} GitLab repositories (filtered by commit threshold)")
+        elif not fetch_gitlab:
+            print("Skipping GitLab repositories due to --platform restriction")
 
         # Fetch GitHub repositories
-        if self.github_token or github_username:
+        if fetch_github and (self.github_token or github_username):
             print("Fetching GitHub repositories...")
             github_repos = self.fetch_github_repos(github_username)
             print(f"Processing {len(github_repos)} GitHub repositories with detailed analysis...")
@@ -704,9 +817,16 @@ Format the response in markdown for easy reading and presentation.
                         print(f"  Skipping {repo['full_name']} - insufficient user commits ({processed_repo.get('user_commits_count', 0)})")
             all_projects.extend(github_projects)
             print(f"Processed {len(github_projects)} GitHub repositories (filtered by commit threshold)")
+        elif not fetch_github:
+            print("Skipping GitHub repositories due to --platform restriction")
 
         if not all_projects:
             print("No projects found. Please check your credentials and usernames.")
+            print("\nDEBUG: Troubleshooting tips:")
+            print("1. Verify your GitHub/GitLab tokens have the correct permissions")
+            print("2. Check if user info was retrieved correctly (see output above)")
+            print("3. Try lowering --min-commits if you have commits but they're not being counted")
+            print("4. Ensure your commit email matches your GitHub/GitLab account email")
             return None
         
         print(f"\nTotal projects found: {len(all_projects)}")
@@ -749,14 +869,14 @@ Format the response in markdown for easy reading and presentation.
         print(f"Stage 2 completed! Portfolio summary saved to: {filename}")
         return summary
     
-    def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False, stage: int = None):
+    def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False, stage: int = None, platform: str = None):
         """Main execution method with stage support"""
         print("Starting portfolio generation...")
         
         # Handle stage-specific execution
         if stage == 1:
             print("Running Stage 1 only: Data collection")
-            self.run_stage_1(github_username, gitlab_username)
+            self.run_stage_1(github_username, gitlab_username, platform)
             return
         elif stage == 2:
             print("Running Stage 2 only: Data analysis")
@@ -776,7 +896,7 @@ Format the response in markdown for easy reading and presentation.
         
         # Run both stages
         print("Running both stages: Data collection and analysis")
-        projects_data = self.run_stage_1(github_username, gitlab_username)
+        projects_data = self.run_stage_1(github_username, gitlab_username, platform)
         if projects_data:
             self.run_stage_2(projects_data)
             print("\nPortfolio generation completed!")
@@ -790,11 +910,12 @@ if __name__ == "__main__":
     parser.add_argument("--use-existing", action="store_true", help="Use the most recent portfolio data file instead of fetching new data")
     parser.add_argument("--stage", type=int, choices=[1, 2], help="Run specific stage: 1=get JSON data, 2=analyze data (default: run both)")
     parser.add_argument("--min-commits", type=int, default=1, help="Minimum user commits required for a project to be included (default: 1)")
+    parser.add_argument("--platform", choices=['github', 'gitlab'], help="Analyze only specific platform in stage 1 (default: analyze both)")
     
     args = parser.parse_args()
     
     try:
         generator = PortfolioGenerator(min_commits=args.min_commits)
-        generator.run(args.github_username, args.gitlab_username, args.use_existing, args.stage)
+        generator.run(args.github_username, args.gitlab_username, args.use_existing, args.stage, args.platform)
     except Exception as e:
         print(f"Error: {e}")

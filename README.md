@@ -2,6 +2,14 @@
 
 A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses the Anthropic API to generate a comprehensive portfolio summary. See a output example at `output_example.md`.
 
+## Recent Updates
+
+### v1.1.0 - Improved Commit Detection & Platform Selection
+- **Fixed commit counting**: Improved user commit detection by tracking multiple email addresses and usernames
+- **Enhanced debugging**: Added detailed output to help troubleshoot commit counting issues
+- **Platform selection**: New `--platform` option to analyze only GitHub or only GitLab repositories
+- **Better error handling**: More informative error messages and troubleshooting tips
+
 ## Setup
 
 1. Install dependencies:
@@ -71,6 +79,15 @@ python portfolio_generator.py --min-commits 5
 ```
 Only includes projects where you have at least 5 commits (default: 1)
 
+#### Platform Selection
+```bash
+# Analyze only GitHub repositories
+python portfolio_generator.py --platform github
+
+# Analyze only GitLab repositories
+python portfolio_generator.py --platform gitlab
+```
+
 #### Combined Example
 ```bash
 python portfolio_generator.py --github-username myuser --min-commits 10 --stage 1
@@ -110,6 +127,8 @@ The script generates two files:
 - **Stage-based execution**: Run data collection and analysis separately
 - **Configurable commit threshold**: Filter projects by minimum user commits
 - **Total commit tracking**: Shows total commits across all selected projects
+- **Platform selection**: Analyze only GitHub or only GitLab repositories
+- **Improved commit detection**: Better matching of user commits across multiple email addresses
 
 ## Command Line Options
 
@@ -120,3 +139,4 @@ The script generates two files:
 | `--use-existing` | Use most recent portfolio data file instead of fetching new data | False |
 | `--stage` | Run specific stage: 1=get JSON data, 2=analyze data | Both stages |
 | `--min-commits` | Minimum user commits required for a project to be included | 1 |
+| `--platform` | Analyze only specific platform: `github` or `gitlab` | Both platforms |
