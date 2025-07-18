@@ -1,8 +1,17 @@
 # Portfolio Generator
 
-A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses the Anthropic API to generate a comprehensive portfolio summary. See a output example at `output_example.md`.
+A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses the Anthropic API to generate a comprehensive portfolio summary with detailed project analysis. See a output example at `output_example.md`.
+
+🌟 **NEW**: Now includes estimated lines of code and highlights your top 5 projects!
 
 ## Recent Updates
+
+### v1.6.0 - Enhanced Portfolio Analysis & Simplified Workflow
+- **Lines of code estimation**: Automatically estimates total lines of code across all projects
+- **Top 5 projects highlight**: AI identifies and features your most significant projects
+- **Streamlined workflow**: Removed HTML generation for faster, focused portfolio creation
+- **Enhanced AI analysis**: Improved project ranking and technical skill assessment
+- **Performance improvements**: Faster execution with simplified two-stage process
 
 ### v1.3.0 - Smart Data Filtering & Clean JSON Output
 - **Conditional attribute inclusion**: Only includes stars/forks if > 0, descriptions/READMEs if not empty
@@ -12,7 +21,7 @@ A Python script that scrapes data from your GitHub and GitLab repositories (publ
 
 ### v1.2.0 - Enhanced AI Analysis & Project Details
 - **Comprehensive AI prompts**: Significantly improved AI analysis with professional portfolio writing approach
-- **Project details file**: New detailed project breakdown sorted by contribution level
+- **Interactive HTML portfolio**: Complete responsive website with project showcase and professional presentation
 - **Duplicate commit filtering**: Ignores commits with identical messages to focus on unique contributions
 - **Enhanced sorting**: Projects sorted by commits, stars, forks, and documentation quality
 - **Interview preparation**: AI-generated talking points and project highlights for interviews
@@ -76,13 +85,13 @@ Fetches repository data and saves to `portfolio_data_[timestamp].json`
 ```bash
 python portfolio_generator.py --stage 2
 ```
-Analyzes the most recent data file and generates portfolio summary
+Analyzes the most recent data file and generates portfolio summary with top 5 projects and lines of code estimation
 
 #### Run Both Stages (Default)
 ```bash
 python portfolio_generator.py
 ```
-Runs both stages sequentially
+Runs data collection and analysis sequentially
 
 ### Additional Options
 
@@ -131,29 +140,38 @@ python portfolio_generator.py --github-username myuser --min-commits 10 --max-co
 
 ## Output
 
-The script generates three files:
-- `portfolio_data_[timestamp].json` - Raw repository data
-- `portfolio_summary_[timestamp].md` - AI-generated comprehensive portfolio summary
-- `portfolio_projects_[timestamp].md` - Detailed project breakdown sorted by contribution level
+The script generates the following files:
+- **Stage 1**: `portfolio_data_[timestamp].json` - Raw repository data
+- **Stage 2**: `portfolio_summary_[timestamp].md` - AI-generated comprehensive portfolio summary with top 5 projects and lines of code estimation
 
 ## Features
 
+### 🚀 **Core Functionality**
 - Fetches both public and private repositories
 - Supports GitHub and GitLab (including self-hosted)
-- Extracts key metrics: stars, forks, languages, topics
-- Generates professional portfolio summaries using AI
-- Handles rate limiting and pagination
+- Extracts comprehensive metrics: stars, forks, languages, commit history
+- Handles rate limiting and pagination automatically
 - Saves results with timestamps
+
+### 🤖 **AI-Powered Analysis**
+- **Professional portfolio summaries**: Comprehensive analysis using Anthropic API
+- **Top 5 projects highlight**: AI identifies and features your most significant projects
+- **Lines of code estimation**: Automatically calculates approximate lines of code across all projects
+- **Interview preparation**: AI-generated talking points and project highlights
+
+### ⚙️ **Advanced Controls**
 - **Stage-based execution**: Run data collection and analysis separately
-- **Configurable commit threshold**: Filter projects by minimum user commits
-- **Total commit tracking**: Shows total commits across all selected projects
 - **Platform selection**: Analyze only GitHub or only GitLab repositories
-- **Improved commit detection**: Better matching of user commits across multiple email addresses
-- **Duplicate filtering**: Ignores commits with identical messages for cleaner analysis
-- **Professional AI analysis**: Enhanced prompts for comprehensive portfolio and project analysis
-- **Project details file**: Separate detailed breakdown sorted by contribution level with interview prep
-- **Smart data filtering**: Conditional inclusion of attributes based on value (stars/forks > 0, non-empty descriptions/READMEs)
-- **Total commits tracking**: Shows all commits in repository from all users for better context
+- **Configurable commit threshold**: Filter projects by minimum user commits
+- **User-controlled commit limits**: `--max-commits` option for managing JSON size
+- **Smart data filtering**: Conditional inclusion based on value (stars/forks > 0, non-empty content)
+
+### 🔧 **Technical Features**
+- **Improved commit detection**: Better matching across multiple email addresses
+- **Duplicate filtering**: Ignores identical commit messages for cleaner analysis
+- **Total commit tracking**: Shows all commits in repository from all users
+- **Enhanced debugging**: Detailed output for troubleshooting
+- **Professional error handling**: Informative messages and troubleshooting tips
 
 ## Command Line Options
 
@@ -171,19 +189,12 @@ The script generates three files:
 
 ### Portfolio Summary (`portfolio_summary_[timestamp].md`)
 A comprehensive portfolio overview including:
-- Executive summary of developer profile
-- Technical skills and expertise analysis
+- Executive summary of developer profile with estimated lines of code
+- Top 5 featured projects with detailed analysis
+- Technical skills and expertise analysis ranked by proficiency
 - Development practices and code quality assessment
 - Professional growth timeline
 - Portfolio presentation recommendations
-
-### Project Details (`portfolio_projects_[timestamp].md`)
-Detailed project breakdown with:
-- Projects sorted by contribution level (most worked on first)
-- Technical implementation details for each project
-- Architecture and technology stack analysis
-- Interview talking points for each project
-- Contribution summaries and portfolio highlights
 
 ### Raw Data (`portfolio_data_[timestamp].json`)
 Complete structured data including:
@@ -219,6 +230,8 @@ If you get "prompt is too long" errors, you have several options:
 ```bash
 python portfolio_generator.py --max-commits 15 --min-commits 3
 ```
+
+**Note:** The portfolio summary now includes estimated lines of code and highlights your top 5 most significant projects.
 
 ### No projects found
 

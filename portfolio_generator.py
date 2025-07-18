@@ -593,6 +593,51 @@ class PortfolioGenerator:
         
         return dict(languages)
     
+    def estimate_lines_of_code(self, projects: List[Dict[str, Any]]) -> Dict[str, int]:
+        """Estimate lines of code based on file extensions and project structure"""
+        # Average lines per file by extension (rough estimates)
+        lines_per_file = {
+            'py': 150, 'js': 120, 'ts': 120, 'java': 200, 'cpp': 180, 'c': 160,
+            'cs': 180, 'php': 140, 'rb': 120, 'go': 140, 'rs': 160, 'swift': 140,
+            'kt': 160, 'html': 80, 'css': 60, 'scss': 70, 'sass': 70, 'vue': 100,
+            'jsx': 120, 'tsx': 120, 'sql': 30, 'r': 100, 'matlab': 120, 'sh': 40,
+            'yml': 20, 'yaml': 20, 'json': 15, 'xml': 25, 'md': 50, 'txt': 25
+        }
+        
+        total_lines = 0
+        language_lines = {}
+        
+        for project in projects:
+            if 'languages' in project:
+                for lang, byte_count in project['languages'].items():
+                    # Rough conversion: bytes to lines (assuming avg 60 chars per line)
+                    estimated_lines = max(1, byte_count // 60)
+                    language_lines[lang] = language_lines.get(lang, 0) + estimated_lines
+                    total_lines += estimated_lines
+            elif 'folder_structure' in project and 'file_types' in project['folder_structure']:
+                # Fallback: estimate from file types
+                file_types = project['folder_structure']['file_types']
+                for ext, count in file_types.items():
+                    if ext in lines_per_file:
+                        estimated_lines = count * lines_per_file[ext]
+                        # Map extension to language
+                        lang_mapping = {
+                            'py': 'Python', 'js': 'JavaScript', 'ts': 'TypeScript',
+                            'java': 'Java', 'cpp': 'C++', 'c': 'C', 'cs': 'C#',
+                            'php': 'PHP', 'rb': 'Ruby', 'go': 'Go', 'rs': 'Rust',
+                            'swift': 'Swift', 'kt': 'Kotlin', 'html': 'HTML',
+                            'css': 'CSS', 'scss': 'SCSS', 'sass': 'Sass',
+                            'vue': 'Vue', 'jsx': 'React', 'tsx': 'React TypeScript'
+                        }
+                        lang = lang_mapping.get(ext, ext.upper())
+                        language_lines[lang] = language_lines.get(lang, 0) + estimated_lines
+                        total_lines += estimated_lines
+        
+        return {
+            'total_lines': total_lines,
+            'by_language': language_lines
+        }
+    
     def clean_project_data(self, project: Dict[str, Any]) -> Dict[str, Any]:
         """Clean project data by removing unwanted attributes and simplifying user_commits"""
         cleaned_project = project.copy()
@@ -822,8 +867,40 @@ class PortfolioGenerator:
         """Generate portfolio summary using Anthropic API"""
         project_data = json.dumps(projects, indent=2)
         
+        # Get top 5 projects by various metrics
+        top_projects_by_commits = sorted(projects, key=lambda p: p.get('user_commits_count', 0), reverse=True)[:5]
+        top_projects_by_stars = sorted([p for p in projects if p.get('stars', 0) > 0], key=lambda p: p.get('stars', 0), reverse=True)[:5]
+        
+        # Calculate lines of code estimation
+        lines_data = self.estimate_lines_of_code(projects)
+        total_lines = lines_data['total_lines']
+        lines_by_language = lines_data['by_language']
+        
+        # Format top projects summary
+        top_projects_summary = []
+        for project in top_projects_by_commits:
+            summary = {
+                'name': project.get('name', 'Unknown'),
+                'commits': project.get('user_commits_count', 0),
+                'stars': project.get('stars', 0),
+                'description': project.get('description', ''),
+                'languages': list(project.get('languages', {}).keys())[:3],
+                'project_type': project.get('folder_structure', {}).get('project_type', 'general')
+            }
+            top_projects_summary.append(summary)
+        
         prompt = f"""
 You are a professional portfolio writer and technical recruiter. Based on the following detailed project data from GitHub and GitLab repositories, create a comprehensive portfolio summary that highlights the developer's skills, contributions, and expertise.
+
+**Key Statistics:**
+- Total Projects: {len(projects)}
+- Total User Commits: {sum(p.get('user_commits_count', 0) for p in projects)}
+- Total Stars Earned: {sum(p.get('stars', 0) for p in projects)}
+- Estimated Lines of Code: {total_lines:,}
+- Top Languages by Lines: {', '.join([f'{lang} ({lines:,})' for lang, lines in sorted(lines_by_language.items(), key=lambda x: x[1], reverse=True)[:5]])}
+
+**Top 5 Projects by Contribution:**
+{json.dumps(top_projects_summary, indent=2)}
 
 Project Data includes:
 - Repository metadata (stars, forks, dates, topics, commit counts)
@@ -840,46 +917,54 @@ Project Data:
 Please create a comprehensive portfolio summary with the following sections:
 
 ## 1. Executive Summary
-- Developer profile overview
+- Developer profile overview with estimated lines of code ({total_lines:,})
 - Years of experience estimation based on project timeline
 - Primary technical focus areas
 - Notable achievements and standout projects
 
-## 2. Technical Skills & Expertise
-- Programming languages (ranked by proficiency evidence)
+## 2. Top 5 Featured Projects
+Create a detailed section highlighting the top 5 projects from the summary above, including:
+- Project name and description
+- Technical stack and complexity
+- Your contribution level (commits, impact)
+- Key features and innovations
+- Business value and real-world applicability
+
+## 3. Technical Skills & Expertise
+- Programming languages (ranked by proficiency evidence and lines of code)
 - Frameworks and libraries (with usage context)
 - Development tools and environments
 - Architecture patterns and design principles demonstrated
 - Database technologies and data handling
 - DevOps and deployment practices
 
-## 3. Project Portfolio Analysis
+## 4. Project Portfolio Analysis
 - Most significant projects (based on commits, complexity, and impact)
 - Project diversity and problem-solving range
 - Evidence of full-stack capabilities
 - Open source contributions and community engagement
 - Commercial vs. personal project balance
 
-## 4. Development Practices & Code Quality
+## 5. Development Practices & Code Quality
 - Code organization and architectural patterns
 - Documentation quality and README standards
 - Commit message quality and development workflow
 - Testing practices and quality assurance
 - Version control and collaboration patterns
 
-## 5. Professional Growth & Learning
+## 6. Professional Growth & Learning
 - Technology adoption timeline
 - Increasing project complexity over time
 - Learning new technologies and adaptation
 - Problem-solving evolution and expertise development
 
-## 6. Standout Qualities
+## 7. Standout Qualities
 - Unique technical combinations or specializations
 - Innovation and creative problem-solving
 - Leadership and mentoring evidence
 - Industry-specific expertise
 
-## 7. Portfolio Presentation Recommendations
+## 8. Portfolio Presentation Recommendations
 - Which projects to highlight in interviews
 - Technical talking points for each major project
 - Areas of expertise to emphasize
@@ -892,6 +977,7 @@ Analysis Guidelines:
 - Look for patterns in commit messages showing professional development practices
 - Assess project complexity through folder structure and file types
 - Consider real-world applicability and business value of projects
+- Emphasize the estimated {total_lines:,} lines of code as a measure of coding experience
 
 Format the response in professional markdown suitable for portfolio presentation.
 """
@@ -907,122 +993,8 @@ Format the response in professional markdown suitable for portfolio presentation
             print(f"Error generating summary with Anthropic API: {e}")
             return "Error generating portfolio summary."
     
-    def generate_project_details(self, projects: List[Dict[str, Any]]) -> str:
-        """Generate detailed project breakdown using Anthropic API"""
-        # Sort projects by contribution level (commits, then stars, then recency)
-        # Note: stars and forks are only present if > 0, so we default to 0 for sorting
-        sorted_projects = sorted(projects, key=lambda p: (
-            p.get('user_commits_count', 0),
-            p.get('stars', 0),
-            p.get('forks', 0),
-            len(p.get('readme', '')),
-            p.get('updated_at', '')
-        ), reverse=True)
-        
-        project_data = json.dumps(sorted_projects, indent=2)
-        
-        prompt = f"""
-You are a technical portfolio consultant. Create a detailed project breakdown document that a developer can use to showcase their work in interviews and portfolio presentations.
-
-The projects are already sorted by contribution level (most worked on first). For each project, analyze and present:
-
-**Project Data:**
-{project_data}
-
-**Create a detailed project breakdown with the following format:**
-
-# Project Portfolio Details
-
-*Projects sorted by contribution level and significance*
-
-## High-Impact Projects
-*(Projects with substantial commits, good documentation, or significant engagement)*
-
-### [Project Name]
-**Repository:** [GitHub/GitLab URL]  
-**Primary Language:** [Main language]  
-**Contribution Level:** [Number] commits | [Number] stars | [Number] forks  
-**Last Updated:** [Date]  
-**Project Type:** [Web/Mobile/Backend/Data/DevOps/etc.]
-
-**Description:**
-[Clear, concise description of what the project does and its purpose]
-
-**Technical Implementation:**
-- **Technologies:** [List all technologies, frameworks, libraries used]
-- **Architecture:** [Brief description of the architectural approach]
-- **Key Features:** [Main functionalities implemented]
-- **Standards:** [Code organization, testing, documentation quality]
-
-**Contribution Summary:**
-- [Number] total commits showing [active/moderate/light] development
-- [Analysis of commit patterns and development approach]
-- [Notable features or complexity indicators]
-
-**Portfolio Talking Points:**
-- [2-3 key technical achievements or challenges solved]
-- [Skills demonstrated through this project]
-- [Business value or real-world applicability]
-
----
-
-## Medium-Impact Projects
-*(Projects with moderate contribution or specialized focus)*
-
-[Same format as above for medium-impact projects]
-
----
-
-## Experimental/Learning Projects
-*(Projects with lighter contribution but showing learning or experimentation)*
-
-[Same format as above, but more concise for smaller projects]
-
----
-
-## Summary Statistics
-- **Total Projects Analyzed:** [Number]
-- **Primary Languages:** [Top 3-5 languages by usage]
-- **Most Active Project:** [Project name with highest commits]
-- **Most Popular Project:** [Project name with highest stars]
-- **Technology Diversity:** [Brief assessment of technology stack breadth]
-- **Development Patterns:** [Analysis of commit frequency and project maintenance]
-
-## Interview Preparation
-**Projects to Highlight:**
-1. [Most significant project] - for [specific skills/technologies]
-2. [Second project] - for [different skills/technologies]
-3. [Third project] - for [additional capabilities]
-
-**Technical Depth Areas:**
-- [Area 1]: Demonstrated through [specific projects]
-- [Area 2]: Shown in [specific projects]
-- [Area 3]: Evidenced by [specific projects]
-
-Guidelines:
-- Focus on projects with >1 commit for substantial analysis
-- Highlight projects with good documentation (substantial README)
-- Emphasize projects showing full-stack or specialized skills
-- Note projects with external validation (stars, forks)
-- Include recent projects to show current activity
-- Mention technology combinations that show versatility
-- Consider business/practical applications of projects
-
-Format in clean, professional markdown suitable for portfolio presentation and interview preparation.
-"""
-
-        try:
-            response = self.anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
-                max_tokens=4000,
-                messages=[{"role": "user", "content": prompt}]
-            )
-            return response.content[0].text
-        except Exception as e:
-            print(f"Error generating project details with Anthropic API: {e}")
-            return "Error generating project details."
     
-    def save_results(self, projects: List[Dict[str, Any]], summary: str, project_details: str):
+    def save_results(self, projects: List[Dict[str, Any]], summary: str):
         """Save results to files"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -1034,14 +1006,9 @@ Format in clean, professional markdown suitable for portfolio presentation and i
         with open(f'portfolio_summary_{timestamp}.md', 'w', encoding='utf-8') as f:
             f.write(summary)
         
-        # Save project details
-        with open(f'portfolio_projects_{timestamp}.md', 'w', encoding='utf-8') as f:
-            f.write(project_details)
-        
         print(f"Results saved:")
         print(f"- Raw data: portfolio_data_{timestamp}.json")
         print(f"- Portfolio summary: portfolio_summary_{timestamp}.md")
-        print(f"- Project details: portfolio_projects_{timestamp}.md")
     
     def run_stage_1(self, github_username: str = None, gitlab_username: str = None, platform: str = None):
         """Stage 1: Get JSON data from repositories"""
@@ -1117,7 +1084,7 @@ Format in clean, professional markdown suitable for portfolio presentation and i
         return all_projects
     
     def run_stage_2(self, projects_data: List[Dict[str, Any]] = None):
-        """Stage 2: Analyze the data and generate portfolio summary and project details"""
+        """Stage 2: Analyze the data and generate portfolio summary"""
         print("Stage 2: Analyzing data and generating portfolio summary...")
         
         if projects_data is None:
@@ -1144,14 +1111,12 @@ Format in clean, professional markdown suitable for portfolio presentation and i
         print("Generating portfolio summary...")
         summary = self.generate_summary(projects_data)
         
-        print("Generating detailed project breakdown...")
-        project_details = self.generate_project_details(projects_data)
+        # Save files
+        self.save_results(projects_data, summary)
         
-        # Save both files
-        self.save_results(projects_data, summary, project_details)
-        
-        print(f"Stage 2 completed! Portfolio files generated.")
-        return summary, project_details
+        print(f"Stage 2 completed! Portfolio summary generated.")
+        return summary
+    
     
     def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False, stage: int = None, platform: str = None):
         """Main execution method with stage support"""
@@ -1186,7 +1151,6 @@ Format in clean, professional markdown suitable for portfolio presentation and i
             print("\nPortfolio generation completed!")
             print("\nFiles generated:")
             print("- Portfolio Summary: Comprehensive overview and analysis")
-            print("- Project Details: Detailed breakdown sorted by contribution level")
             print("- Raw Data: Complete JSON data for further analysis")
 
 if __name__ == "__main__":
@@ -1196,7 +1160,7 @@ if __name__ == "__main__":
     parser.add_argument("--github-username", help="GitHub username (optional if using token)")
     parser.add_argument("--gitlab-username", help="GitLab username (optional if using token)")
     parser.add_argument("--use-existing", action="store_true", help="Use the most recent portfolio data file instead of fetching new data")
-    parser.add_argument("--stage", type=int, choices=[1, 2], help="Run specific stage: 1=get JSON data, 2=analyze data (default: run both)")
+    parser.add_argument("--stage", type=int, choices=[1, 2], help="Run specific stage: 1=get JSON data, 2=analyze data (default: run both stages)")
     parser.add_argument("--min-commits", type=int, default=1, help="Minimum user commits required for a project to be included (default: 1)")
     parser.add_argument("--platform", choices=['github', 'gitlab'], help="Analyze only specific platform in stage 1 (default: analyze both)")
     parser.add_argument("--max-commits", type=int, help="Maximum commits per project to include in JSON (default: all commits)")
