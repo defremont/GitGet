@@ -16,6 +16,9 @@ A powerful, modular Python application that analyzes your GitHub and GitLab repo
 # Install dependencies
 pip install -r requirements.txt
 
+# Set up API key (get one from https://aistudio.google.com/)
+export GEMINI_API_KEY="your_gemini_api_key"
+
 # Check configuration
 python portfolio_generator_cli.py --check-config
 
