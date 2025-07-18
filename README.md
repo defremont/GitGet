@@ -1,6 +1,6 @@
 # Portfolio Generator
 
-A Python script that scrapes data from your GitHub and GitLab repositories and uses the Anthropic API to generate a comprehensive portfolio summary.
+A Python script that scrapes data from your GitHub and GitLab repositories (public and private) and uses the Anthropic API to generate a comprehensive portfolio summary. See a output example at `output_example.md`.
 
 ## Setup
 
