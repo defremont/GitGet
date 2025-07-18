@@ -16,11 +16,13 @@ from collections import Counter
 import glob
 
 class PortfolioGenerator:
-    def __init__(self):
+    def __init__(self, min_commits=1):
         self.github_token = os.getenv('GITHUB_TOKEN')
         self.gitlab_token = os.getenv('GITLAB_TOKEN')
         self.anthropic_key = os.getenv('ANTHROPIC_API_KEY')
         self.gitlab_url = os.getenv('GITLAB_URL', 'https://gitlab.com')
+        self.min_commits = min_commits
+        self.total_user_commits = 0
         
         if not self.anthropic_key:
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
@@ -166,13 +168,20 @@ class PortfolioGenerator:
         except Exception as e:
             print(f"Error fetching tree for {repo_full_name}: {e}")
         
-        # Fetch recent commits
+        # Fetch all user commits (paginated)
         try:
-            commits_response = requests.get(f'https://api.github.com/repos/{repo_full_name}/commits?per_page=100', headers=headers)
-            if commits_response.status_code == 200:
+            user_commits = []
+            page = 1
+            while True:
+                commits_response = requests.get(f'https://api.github.com/repos/{repo_full_name}/commits?per_page=100&page={page}', headers=headers)
+                if commits_response.status_code != 200:
+                    break
+                    
                 commits_data = commits_response.json()
+                if not commits_data:
+                    break
+                
                 # Filter commits to only include user commits
-                user_commits = []
                 for commit in commits_data:
                     author_email = commit['commit']['author'].get('email', '').lower()
                     author_name = commit['commit']['author']['name'].lower()
@@ -181,20 +190,26 @@ class PortfolioGenerator:
                     if ((self.user_email and author_email and self.user_email.lower() == author_email) or
                         (self.user_name and author_name and self.user_name.lower() == author_name)):
                         user_commits.append({
-                            'message': commit['commit']['message'][:100],
+                            'message': commit['commit']['message'],
                             'date': commit['commit']['author']['date'],
                             'author': commit['commit']['author']['name'],
                             'author_email': commit['commit']['author'].get('email', ''),
                             'sha': commit['sha'][:8]
                         })
-                        
-                details['user_commits'] = user_commits[:20]  # Limit to 20 user commits
-                details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
                 
-                # Count user commits
-                details['user_commits_count'] = len(details.get('user_commits', []))
-                details['total_commits_fetched'] = len(commits_data)
-            time.sleep(0.1)
+                page += 1
+                time.sleep(0.1)
+                
+                # Limit to reasonable number of pages to avoid infinite loops
+                if page > 20:
+                    break
+                        
+            details['user_commits'] = user_commits
+            details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
+            
+            # Count user commits
+            details['user_commits_count'] = len(user_commits)
+            details['total_commits_fetched'] = len(user_commits)
         except Exception as e:
             print(f"Error fetching commits for {repo_full_name}: {e}")
             details['user_commits_count'] = 0
@@ -371,13 +386,20 @@ class PortfolioGenerator:
         except Exception as e:
             print(f"Error fetching tree for project {project_id}: {e}")
         
-        # Fetch recent commits
+        # Fetch all user commits (paginated)
         try:
-            commits_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/commits?per_page=100', headers=headers)
-            if commits_response.status_code == 200:
+            user_commits = []
+            page = 1
+            while True:
+                commits_response = requests.get(f'{self.gitlab_url}/api/v4/projects/{project_id}/repository/commits?per_page=100&page={page}', headers=headers)
+                if commits_response.status_code != 200:
+                    break
+                    
                 commits_data = commits_response.json()
+                if not commits_data:
+                    break
+                
                 # Filter commits to only include user commits
-                user_commits = []
                 for commit in commits_data:
                     author_email = commit['author_email'].lower()
                     author_name = commit['author_name'].lower()
@@ -386,20 +408,26 @@ class PortfolioGenerator:
                     if ((self.user_email and author_email and self.user_email.lower() == author_email) or
                         (self.user_name and author_name and self.user_name.lower() == author_name)):
                         user_commits.append({
-                            'message': commit['message'][:100],
+                            'message': commit['message'],
                             'date': commit['created_at'],
                             'author': commit['author_name'],
                             'author_email': commit['author_email'],
                             'sha': commit['id'][:8]
                         })
-                        
-                details['user_commits'] = user_commits[:20]  # Limit to 20 user commits
-                details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
                 
-                # Count user commits
-                details['user_commits_count'] = len(details.get('user_commits', []))
-                details['total_commits_fetched'] = len(commits_data)
-            time.sleep(0.1)
+                page += 1
+                time.sleep(0.1)
+                
+                # Limit to reasonable number of pages to avoid infinite loops
+                if page > 20:
+                    break
+                        
+            details['user_commits'] = user_commits
+            details['recent_commits'] = user_commits[:20]  # Keep for backward compatibility
+            
+            # Count user commits
+            details['user_commits_count'] = len(user_commits)
+            details['total_commits_fetched'] = len(user_commits)
         except Exception as e:
             print(f"Error fetching commits for project {project_id}: {e}")
             details['user_commits_count'] = 0
@@ -472,6 +500,42 @@ class PortfolioGenerator:
         
         return dict(languages)
     
+    def clean_project_data(self, project: Dict[str, Any]) -> Dict[str, Any]:
+        """Clean project data by removing unwanted attributes and simplifying user_commits"""
+        cleaned_project = project.copy()
+        
+        # Remove unwanted attributes
+        attrs_to_remove = [
+            'files',
+            'meets_commit_threshold',
+            'topics',
+            'is_fork',
+            'is_private',
+            'size',
+            'recent_commits'
+        ]
+        
+        for attr in attrs_to_remove:
+            cleaned_project.pop(attr, None)
+        
+        # Remove folders from folder_structure if it exists
+        if 'folder_structure' in cleaned_project and isinstance(cleaned_project['folder_structure'], dict):
+            cleaned_project['folder_structure'].pop('folders', None)
+        
+        # Clean user_commits to only include message and date
+        if 'user_commits' in cleaned_project and isinstance(cleaned_project['user_commits'], list):
+            cleaned_commits = []
+            for commit in cleaned_project['user_commits']:
+                if isinstance(commit, dict):
+                    cleaned_commit = {
+                        'message': commit.get('message', ''),
+                        'date': commit.get('date', '')
+                    }
+                    cleaned_commits.append(cleaned_commit)
+            cleaned_project['user_commits'] = cleaned_commits
+        
+        return cleaned_project
+    
     def process_github_repo(self, repo: Dict[str, Any]) -> Dict[str, Any]:
         """Process GitHub repository data with detailed information"""
         processed_repo = {
@@ -496,9 +560,10 @@ class PortfolioGenerator:
         details = self.fetch_github_repo_details(repo['full_name'])
         processed_repo.update(details)
         
-        # Filter repositories with at least 10 user commits
+        # Filter repositories with at least min_commits user commits
         user_commits = processed_repo.get('user_commits_count', 0)
-        processed_repo['meets_commit_threshold'] = user_commits >= 10
+        processed_repo['meets_commit_threshold'] = user_commits >= self.min_commits
+        self.total_user_commits += user_commits
         
         return processed_repo
     
@@ -526,9 +591,10 @@ class PortfolioGenerator:
         details = self.fetch_gitlab_repo_details(repo['id'])
         processed_repo.update(details)
         
-        # Filter repositories with at least 10 user commits
+        # Filter repositories with at least min_commits user commits
         user_commits = processed_repo.get('user_commits_count', 0)
-        processed_repo['meets_commit_threshold'] = user_commits >= 10
+        processed_repo['meets_commit_threshold'] = user_commits >= self.min_commits
+        self.total_user_commits += user_commits
         
         return processed_repo
     
@@ -598,21 +664,9 @@ Format the response in markdown for easy reading and presentation.
         print(f"- Raw data: portfolio_data_{timestamp}.json")
         print(f"- Portfolio summary: portfolio_summary_{timestamp}.md")
     
-    def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False):
-        """Main execution method"""
-        print("Starting portfolio generation...")
-        
-        # Option to use existing data
-        if use_existing_data:
-            existing_data = self.load_latest_portfolio_data()
-            if existing_data:
-                print("Generating portfolio summary from existing data...")
-                summary = self.generate_summary(existing_data)
-                self.save_results(existing_data, summary)
-                print("\nPortfolio generation completed using existing data!")
-                return
-            else:
-                print("No existing data found, proceeding with fresh data collection...")
+    def run_stage_1(self, github_username: str = None, gitlab_username: str = None):
+        """Stage 1: Get JSON data from repositories"""
+        print("Stage 1: Fetching repository data...")
         
         # Get user information for commit filtering
         self.get_user_info()
@@ -635,7 +689,7 @@ Format the response in markdown for easy reading and presentation.
             all_projects.extend(gitlab_projects)
             print(f"Processed {len(gitlab_projects)} GitLab repositories (filtered by commit threshold)")
 
-         # Fetch GitHub repositories
+        # Fetch GitHub repositories
         if self.github_token or github_username:
             print("Fetching GitHub repositories...")
             github_repos = self.fetch_github_repos(github_username)
@@ -653,15 +707,79 @@ Format the response in markdown for easy reading and presentation.
 
         if not all_projects:
             print("No projects found. Please check your credentials and usernames.")
-            return
+            return None
         
         print(f"\nTotal projects found: {len(all_projects)}")
-        print("Generating portfolio summary with Anthropic API...")
+        print(f"Total user commits across all projects: {self.total_user_commits}")
         
-        summary = self.generate_summary(all_projects)
-        self.save_results(all_projects, summary)
+        # Clean data before saving
+        cleaned_projects = [self.clean_project_data(project) for project in all_projects]
         
-        print("\nPortfolio generation completed!")
+        # Save data
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'portfolio_data_{timestamp}.json'
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(cleaned_projects, f, indent=2, ensure_ascii=False)
+        
+        print(f"Stage 1 completed! Data saved to: {filename}")
+        return all_projects
+    
+    def run_stage_2(self, projects_data: List[Dict[str, Any]] = None):
+        """Stage 2: Analyze the data and generate portfolio summary"""
+        print("Stage 2: Analyzing data and generating portfolio summary...")
+        
+        if projects_data is None:
+            projects_data = self.load_latest_portfolio_data()
+            if not projects_data:
+                print("No data found. Please run stage 1 first or provide data.")
+                return
+        
+        # Count total user commits from the data
+        total_commits = sum(project.get('user_commits_count', 0) for project in projects_data)
+        print(f"Analyzing {len(projects_data)} projects with {total_commits} total user commits...")
+        
+        summary = self.generate_summary(projects_data)
+        
+        # Save summary
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f'portfolio_summary_{timestamp}.md'
+        with open(filename, 'w', encoding='utf-8') as f:
+            f.write(summary)
+        
+        print(f"Stage 2 completed! Portfolio summary saved to: {filename}")
+        return summary
+    
+    def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False, stage: int = None):
+        """Main execution method with stage support"""
+        print("Starting portfolio generation...")
+        
+        # Handle stage-specific execution
+        if stage == 1:
+            print("Running Stage 1 only: Data collection")
+            self.run_stage_1(github_username, gitlab_username)
+            return
+        elif stage == 2:
+            print("Running Stage 2 only: Data analysis")
+            self.run_stage_2()
+            return
+        
+        # Default behavior: run both stages or use existing data
+        if use_existing_data:
+            existing_data = self.load_latest_portfolio_data()
+            if existing_data:
+                print("Generating portfolio summary from existing data...")
+                self.run_stage_2(existing_data)
+                print("\nPortfolio generation completed using existing data!")
+                return
+            else:
+                print("No existing data found, proceeding with fresh data collection...")
+        
+        # Run both stages
+        print("Running both stages: Data collection and analysis")
+        projects_data = self.run_stage_1(github_username, gitlab_username)
+        if projects_data:
+            self.run_stage_2(projects_data)
+            print("\nPortfolio generation completed!")
 
 if __name__ == "__main__":
     import argparse
@@ -670,11 +788,13 @@ if __name__ == "__main__":
     parser.add_argument("--github-username", help="GitHub username (optional if using token)")
     parser.add_argument("--gitlab-username", help="GitLab username (optional if using token)")
     parser.add_argument("--use-existing", action="store_true", help="Use the most recent portfolio data file instead of fetching new data")
+    parser.add_argument("--stage", type=int, choices=[1, 2], help="Run specific stage: 1=get JSON data, 2=analyze data (default: run both)")
+    parser.add_argument("--min-commits", type=int, default=1, help="Minimum user commits required for a project to be included (default: 1)")
     
     args = parser.parse_args()
     
     try:
-        generator = PortfolioGenerator()
-        generator.run(args.github_username, args.gitlab_username, args.use_existing)
+        generator = PortfolioGenerator(min_commits=args.min_commits)
+        generator.run(args.github_username, args.gitlab_username, args.use_existing, args.stage)
     except Exception as e:
         print(f"Error: {e}")

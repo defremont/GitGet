@@ -24,19 +24,56 @@ export GITLAB_URL="https://your-gitlab-instance.com"
 
 ## Usage
 
-### Using API tokens (recommended for private repos):
+### Basic Usage
+
+#### Using API tokens (recommended for private repos):
 ```bash
 python portfolio_generator.py
 ```
 
-### Using usernames (public repos only):
+#### Using usernames (public repos only):
 ```bash
 python portfolio_generator.py --github-username your_github_username --gitlab-username your_gitlab_username
 ```
 
-### Use existing data (fast):
+#### Use existing data (fast):
 ```bash
-  python portfolio_generator.py --use-existing
+python portfolio_generator.py --use-existing
+```
+
+### Stage-based Execution
+
+The script supports two-stage execution for better control:
+
+#### Stage 1: Data Collection Only
+```bash
+python portfolio_generator.py --stage 1
+```
+Fetches repository data and saves to `portfolio_data_[timestamp].json`
+
+#### Stage 2: Analysis Only
+```bash
+python portfolio_generator.py --stage 2
+```
+Analyzes the most recent data file and generates portfolio summary
+
+#### Run Both Stages (Default)
+```bash
+python portfolio_generator.py
+```
+Runs both stages sequentially
+
+### Additional Options
+
+#### Minimum Commits Filter
+```bash
+python portfolio_generator.py --min-commits 5
+```
+Only includes projects where you have at least 5 commits (default: 1)
+
+#### Combined Example
+```bash
+python portfolio_generator.py --github-username myuser --min-commits 10 --stage 1
 ```
 
 ## API Tokens Setup
@@ -70,3 +107,16 @@ The script generates two files:
 - Generates professional portfolio summaries using AI
 - Handles rate limiting and pagination
 - Saves results with timestamps
+- **Stage-based execution**: Run data collection and analysis separately
+- **Configurable commit threshold**: Filter projects by minimum user commits
+- **Total commit tracking**: Shows total commits across all selected projects
+
+## Command Line Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--github-username` | GitHub username (optional if using token) | None |
+| `--gitlab-username` | GitLab username (optional if using token) | None |
+| `--use-existing` | Use most recent portfolio data file instead of fetching new data | False |
+| `--stage` | Run specific stage: 1=get JSON data, 2=analyze data | Both stages |
+| `--min-commits` | Minimum user commits required for a project to be included | 1 |
