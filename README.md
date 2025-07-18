@@ -343,14 +343,14 @@ We welcome contributions! Please see our [Contributing Guidelines](CONTRIBUTING.
 
 ## 📄 License
 
-This project is licensed under the GNU General Public License v3.0 - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the GNU General Public License v3.0 - see the [COPYING](COPYING) file for details.
 
 ## 📚 Documentation
 
 - [Architecture Overview](ARCHITECTURE.md)
 - [Contributing Guidelines](CONTRIBUTING.md)
 - [Changelog](CHANGELOG.md)
-- [License](LICENSE)
+- [License](COPYING)
 
 ## 🙏 Acknowledgments
 
