@@ -710,38 +710,77 @@ class PortfolioGenerator:
         project_data = json.dumps(projects, indent=2)
         
         prompt = f"""
-You are a professional portfolio writer. Based on the following detailed project data from GitHub and GitLab repositories, create a comprehensive portfolio summary that highlights the developer's skills, contributions, and expertise.
+You are a professional portfolio writer and technical recruiter. Based on the following detailed project data from GitHub and GitLab repositories, create a comprehensive portfolio summary that highlights the developer's skills, contributions, and expertise.
 
 Project Data includes:
-- Repository metadata (stars, forks, dates, topics)
-- README content providing project context
-- Folder structure and file organization
-- Programming languages and technologies used
-- Recent commit history and development activity
+- Repository metadata (stars, forks, dates, topics, commit counts)
+- README content providing project context and documentation quality
+- Folder structure and file organization showing architectural understanding
+- Programming languages and technologies with usage statistics
+- Commit history showing development patterns and consistency
 - Project types and complexity indicators
+- Code quality metrics (stars, forks, activity levels)
 
 Project Data:
 {project_data}
 
-Please create:
-1. An executive summary of the developer's profile
-2. Key technical skills and technologies used (based on languages, file types, and project structure)
-3. Notable projects with descriptions, purpose, and technical implementation details
-4. Programming languages and frameworks expertise (with evidence from actual code)
-5. Development patterns, code organization, and software architecture understanding
-6. Project diversity and problem-solving range
-7. Contribution quality based on commit messages and project evolution
-8. Recommendations for portfolio presentation
+Please create a comprehensive portfolio summary with the following sections:
 
-Focus on:
-- Technical depth evidenced by folder structure and file types
-- Project complexity shown through README descriptions and architecture
-- Code quality indicators (stars, forks, activity, commit patterns)
-- Technology stack diversity across different project types
-- Professional growth shown through project timeline and increasing complexity
-- Real-world applicability and problem-solving demonstrated by project purposes
+## 1. Executive Summary
+- Developer profile overview
+- Years of experience estimation based on project timeline
+- Primary technical focus areas
+- Notable achievements and standout projects
 
-Format the response in markdown for easy reading and presentation.
+## 2. Technical Skills & Expertise
+- Programming languages (ranked by proficiency evidence)
+- Frameworks and libraries (with usage context)
+- Development tools and environments
+- Architecture patterns and design principles demonstrated
+- Database technologies and data handling
+- DevOps and deployment practices
+
+## 3. Project Portfolio Analysis
+- Most significant projects (based on commits, complexity, and impact)
+- Project diversity and problem-solving range
+- Evidence of full-stack capabilities
+- Open source contributions and community engagement
+- Commercial vs. personal project balance
+
+## 4. Development Practices & Code Quality
+- Code organization and architectural patterns
+- Documentation quality and README standards
+- Commit message quality and development workflow
+- Testing practices and quality assurance
+- Version control and collaboration patterns
+
+## 5. Professional Growth & Learning
+- Technology adoption timeline
+- Increasing project complexity over time
+- Learning new technologies and adaptation
+- Problem-solving evolution and expertise development
+
+## 6. Standout Qualities
+- Unique technical combinations or specializations
+- Innovation and creative problem-solving
+- Leadership and mentoring evidence
+- Industry-specific expertise
+
+## 7. Portfolio Presentation Recommendations
+- Which projects to highlight in interviews
+- Technical talking points for each major project
+- Areas of expertise to emphasize
+- Potential areas for continued development
+
+Analysis Guidelines:
+- Weight projects by commit count, stars, forks, and recent activity
+- Consider README quality as documentation/communication skills indicator
+- Evaluate technology stack diversity and depth
+- Look for patterns in commit messages showing professional development practices
+- Assess project complexity through folder structure and file types
+- Consider real-world applicability and business value of projects
+
+Format the response in professional markdown suitable for portfolio presentation.
 """
 
         try:
@@ -755,7 +794,121 @@ Format the response in markdown for easy reading and presentation.
             print(f"Error generating summary with Anthropic API: {e}")
             return "Error generating portfolio summary."
     
-    def save_results(self, projects: List[Dict[str, Any]], summary: str):
+    def generate_project_details(self, projects: List[Dict[str, Any]]) -> str:
+        """Generate detailed project breakdown using Anthropic API"""
+        # Sort projects by contribution level (commits, then stars, then recency)
+        sorted_projects = sorted(projects, key=lambda p: (
+            p.get('user_commits_count', 0),
+            p.get('stars', 0),
+            p.get('forks', 0),
+            len(p.get('readme', '')),
+            p.get('updated_at', '')
+        ), reverse=True)
+        
+        project_data = json.dumps(sorted_projects, indent=2)
+        
+        prompt = f"""
+You are a technical portfolio consultant. Create a detailed project breakdown document that a developer can use to showcase their work in interviews and portfolio presentations.
+
+The projects are already sorted by contribution level (most worked on first). For each project, analyze and present:
+
+**Project Data:**
+{project_data}
+
+**Create a detailed project breakdown with the following format:**
+
+# Project Portfolio Details
+
+*Projects sorted by contribution level and significance*
+
+## High-Impact Projects
+*(Projects with substantial commits, good documentation, or significant engagement)*
+
+### [Project Name]
+**Repository:** [GitHub/GitLab URL]  
+**Primary Language:** [Main language]  
+**Contribution Level:** [Number] commits | [Number] stars | [Number] forks  
+**Last Updated:** [Date]  
+**Project Type:** [Web/Mobile/Backend/Data/DevOps/etc.]
+
+**Description:**
+[Clear, concise description of what the project does and its purpose]
+
+**Technical Implementation:**
+- **Technologies:** [List all technologies, frameworks, libraries used]
+- **Architecture:** [Brief description of the architectural approach]
+- **Key Features:** [Main functionalities implemented]
+- **Standards:** [Code organization, testing, documentation quality]
+
+**Contribution Summary:**
+- [Number] total commits showing [active/moderate/light] development
+- [Analysis of commit patterns and development approach]
+- [Notable features or complexity indicators]
+
+**Portfolio Talking Points:**
+- [2-3 key technical achievements or challenges solved]
+- [Skills demonstrated through this project]
+- [Business value or real-world applicability]
+
+---
+
+## Medium-Impact Projects
+*(Projects with moderate contribution or specialized focus)*
+
+[Same format as above for medium-impact projects]
+
+---
+
+## Experimental/Learning Projects
+*(Projects with lighter contribution but showing learning or experimentation)*
+
+[Same format as above, but more concise for smaller projects]
+
+---
+
+## Summary Statistics
+- **Total Projects Analyzed:** [Number]
+- **Primary Languages:** [Top 3-5 languages by usage]
+- **Most Active Project:** [Project name with highest commits]
+- **Most Popular Project:** [Project name with highest stars]
+- **Technology Diversity:** [Brief assessment of technology stack breadth]
+- **Development Patterns:** [Analysis of commit frequency and project maintenance]
+
+## Interview Preparation
+**Projects to Highlight:**
+1. [Most significant project] - for [specific skills/technologies]
+2. [Second project] - for [different skills/technologies]
+3. [Third project] - for [additional capabilities]
+
+**Technical Depth Areas:**
+- [Area 1]: Demonstrated through [specific projects]
+- [Area 2]: Shown in [specific projects]
+- [Area 3]: Evidenced by [specific projects]
+
+Guidelines:
+- Focus on projects with >1 commit for substantial analysis
+- Highlight projects with good documentation (substantial README)
+- Emphasize projects showing full-stack or specialized skills
+- Note projects with external validation (stars, forks)
+- Include recent projects to show current activity
+- Mention technology combinations that show versatility
+- Consider business/practical applications of projects
+
+Format in clean, professional markdown suitable for portfolio presentation and interview preparation.
+"""
+
+        try:
+            response = self.anthropic_client.messages.create(
+                model="claude-sonnet-4-20250514",
+                max_tokens=4000,
+                messages=[{"role": "user", "content": prompt}]
+            )
+            return response.content[0].text
+        except Exception as e:
+            print(f"Error generating project details with Anthropic API: {e}")
+            return "Error generating project details."
+    
+    def save_results(self, projects: List[Dict[str, Any]], summary: str, project_details: str):
         """Save results to files"""
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
         
@@ -767,9 +920,14 @@ Format the response in markdown for easy reading and presentation.
         with open(f'portfolio_summary_{timestamp}.md', 'w', encoding='utf-8') as f:
             f.write(summary)
         
+        # Save project details
+        with open(f'portfolio_projects_{timestamp}.md', 'w', encoding='utf-8') as f:
+            f.write(project_details)
+        
         print(f"Results saved:")
         print(f"- Raw data: portfolio_data_{timestamp}.json")
         print(f"- Portfolio summary: portfolio_summary_{timestamp}.md")
+        print(f"- Project details: portfolio_projects_{timestamp}.md")
     
     def run_stage_1(self, github_username: str = None, gitlab_username: str = None, platform: str = None):
         """Stage 1: Get JSON data from repositories"""
@@ -845,7 +1003,7 @@ Format the response in markdown for easy reading and presentation.
         return all_projects
     
     def run_stage_2(self, projects_data: List[Dict[str, Any]] = None):
-        """Stage 2: Analyze the data and generate portfolio summary"""
+        """Stage 2: Analyze the data and generate portfolio summary and project details"""
         print("Stage 2: Analyzing data and generating portfolio summary...")
         
         if projects_data is None:
@@ -858,16 +1016,17 @@ Format the response in markdown for easy reading and presentation.
         total_commits = sum(project.get('user_commits_count', 0) for project in projects_data)
         print(f"Analyzing {len(projects_data)} projects with {total_commits} total user commits...")
         
+        print("Generating portfolio summary...")
         summary = self.generate_summary(projects_data)
         
-        # Save summary
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f'portfolio_summary_{timestamp}.md'
-        with open(filename, 'w', encoding='utf-8') as f:
-            f.write(summary)
+        print("Generating detailed project breakdown...")
+        project_details = self.generate_project_details(projects_data)
         
-        print(f"Stage 2 completed! Portfolio summary saved to: {filename}")
-        return summary
+        # Save both files
+        self.save_results(projects_data, summary, project_details)
+        
+        print(f"Stage 2 completed! Portfolio files generated.")
+        return summary, project_details
     
     def run(self, github_username: str = None, gitlab_username: str = None, use_existing_data: bool = False, stage: int = None, platform: str = None):
         """Main execution method with stage support"""
@@ -900,6 +1059,10 @@ Format the response in markdown for easy reading and presentation.
         if projects_data:
             self.run_stage_2(projects_data)
             print("\nPortfolio generation completed!")
+            print("\nFiles generated:")
+            print("- Portfolio Summary: Comprehensive overview and analysis")
+            print("- Project Details: Detailed breakdown sorted by contribution level")
+            print("- Raw Data: Complete JSON data for further analysis")
 
 if __name__ == "__main__":
     import argparse

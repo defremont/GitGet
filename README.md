@@ -4,6 +4,13 @@ A Python script that scrapes data from your GitHub and GitLab repositories (publ
 
 ## Recent Updates
 
+### v1.2.0 - Enhanced AI Analysis & Project Details
+- **Comprehensive AI prompts**: Significantly improved AI analysis with professional portfolio writing approach
+- **Project details file**: New detailed project breakdown sorted by contribution level
+- **Duplicate commit filtering**: Ignores commits with identical messages to focus on unique contributions
+- **Enhanced sorting**: Projects sorted by commits, stars, forks, and documentation quality
+- **Interview preparation**: AI-generated talking points and project highlights for interviews
+
 ### v1.1.0 - Improved Commit Detection & Platform Selection
 - **Fixed commit counting**: Improved user commit detection by tracking multiple email addresses and usernames
 - **Enhanced debugging**: Added detailed output to help troubleshoot commit counting issues
@@ -112,9 +119,10 @@ python portfolio_generator.py --github-username myuser --min-commits 10 --stage 
 
 ## Output
 
-The script generates two files:
+The script generates three files:
 - `portfolio_data_[timestamp].json` - Raw repository data
-- `portfolio_summary_[timestamp].md` - AI-generated portfolio summary
+- `portfolio_summary_[timestamp].md` - AI-generated comprehensive portfolio summary
+- `portfolio_projects_[timestamp].md` - Detailed project breakdown sorted by contribution level
 
 ## Features
 
@@ -129,6 +137,9 @@ The script generates two files:
 - **Total commit tracking**: Shows total commits across all selected projects
 - **Platform selection**: Analyze only GitHub or only GitLab repositories
 - **Improved commit detection**: Better matching of user commits across multiple email addresses
+- **Duplicate filtering**: Ignores commits with identical messages for cleaner analysis
+- **Professional AI analysis**: Enhanced prompts for comprehensive portfolio and project analysis
+- **Project details file**: Separate detailed breakdown sorted by contribution level with interview prep
 
 ## Command Line Options
 
@@ -140,3 +151,28 @@ The script generates two files:
 | `--stage` | Run specific stage: 1=get JSON data, 2=analyze data | Both stages |
 | `--min-commits` | Minimum user commits required for a project to be included | 1 |
 | `--platform` | Analyze only specific platform: `github` or `gitlab` | Both platforms |
+
+## Output Files Explained
+
+### Portfolio Summary (`portfolio_summary_[timestamp].md`)
+A comprehensive portfolio overview including:
+- Executive summary of developer profile
+- Technical skills and expertise analysis
+- Development practices and code quality assessment
+- Professional growth timeline
+- Portfolio presentation recommendations
+
+### Project Details (`portfolio_projects_[timestamp].md`)
+Detailed project breakdown with:
+- Projects sorted by contribution level (most worked on first)
+- Technical implementation details for each project
+- Architecture and technology stack analysis
+- Interview talking points for each project
+- Contribution summaries and portfolio highlights
+
+### Raw Data (`portfolio_data_[timestamp].json`)
+Complete structured data including:
+- All repository metadata
+- Commit history and statistics
+- Technology usage and file structure
+- Perfect for further analysis or custom reporting
