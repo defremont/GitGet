@@ -177,7 +177,7 @@ python portfolio_generator.py --model-provider anthropic --model-name claude-3-5
 ### 📊 Model Comparison
 
 #### Google Gemini
-- **gemini-2.5-pro**: Free, excellent analysis quality, no reasoning
+- **gemini-2.5-pro**: Free, excellent analysis quality
 - **gemini-2.5-flash**: Free, fastest generation, good for quick portfolios
 
 #### Anthropic Claude
